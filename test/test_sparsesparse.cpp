@@ -32,15 +32,56 @@ protected:
 };
 
 
-// Tests that STLSparseSparse replicates standard
-// STL iterator with new interface
 TEST_F(SparseSparseTest, CooArray) {
-	CooArray<int, double, 1> arr1;
-	arr1.add({{1}}, 2.);
-	arr1.add({{3}}, 6.);
+	// Make a simple CooArray
+	CooArray<int, double, 1> arr1({{4}}, {{"dim0"}});
+	arr1.add({1}, 2.);
+	arr1.add({3}, 6.);
 	EXPECT_EQ(2, arr1.size());
+	EXPECT_EQ(1, arr1.indices[0][0]);
+	EXPECT_EQ(3, arr1.indices[0][1]);
+	EXPECT_EQ(2., arr1.vals[0]);
+
+	// Test bounds checking
+	try {
+		arr1.add({17}, 4.);
+		FAIL() << "Excpected sparsesparse::Exception";
+	} catch(sparsesparse::Exception const &err) {
+	} catch(...) {
+		FAIL() << "Excpected sparsesparse::Exception";
+	}
 }
 
+
+TEST_F(SparseSparseTest, consolidate) {
+	// 2-D CooArray; test consolidate
+	CooArray<int, double, 2> arr2({2,4});
+	arr2.add({1,3}, 5.);
+	arr2.add({1,2}, 3.);
+	arr2.add({0,3}, 17.);
+	arr2.add({1,2}, 15.);
+
+	arr2.consolidate({1,0});
+	EXPECT_EQ(3, arr2.size());
+	EXPECT_EQ(std::vector<int>({0,1,1}), arr2.indices[0]);	// i
+	EXPECT_EQ(std::vector<int>({3,2,3}), arr2.indices[1]);	// j
+	EXPECT_EQ(std::vector<double>({17., 18., 5.}), arr2.vals);
+
+	// Try out iterators a bit
+	auto ii(arr2.begin());
+	EXPECT_NE(ii, arr2.end());
+	EXPECT_EQ(0, ii.index(0));
+	EXPECT_EQ(3, ii.index(1));
+	EXPECT_EQ(17., ii.val());
+	EXPECT_EQ(17., *ii);
+	++ii;
+	EXPECT_NE(ii, arr2.end());
+	EXPECT_EQ(1, ii.index(0));
+	EXPECT_EQ(2, ii.index(1));
+	EXPECT_EQ(18., *ii);
+
+
+}
 
 int main(int argc, char **argv) {
 	::testing::InitGoogleTest(&argc, argv);

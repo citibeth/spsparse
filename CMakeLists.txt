@@ -10,6 +10,6 @@ include (setup_rpath)
 find_package(gtest REQUIRED)
 
 # -------- Process subdirectories of the build
-add_subdirectory(test)
 add_subdirectory(slib)
 #add_subdirectory(bin)
+add_subdirectory(test)

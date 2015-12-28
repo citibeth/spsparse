@@ -5,8 +5,23 @@
 #include <cstdio>
 #include <functional>
 #include <vector>
+#include <cmath>
+#include <string>
+#include <sstream>
+#include <algorithm>
 
 namespace sparsesparse {
+
+class Exception : public std::exception
+{
+public:
+	virtual ~Exception()
+		{}
+
+	virtual const char* what() const noexcept
+		{ return "sparsesparse::Exception()"; }
+};
+
 
 // This is not possible in C++11
 //extern std::function<void(int, const char *, ...)> error;
@@ -21,15 +36,15 @@ enum class DuplicatePolicy {LEAVE_ALONE, ADD, REPLACE};
 
 // -------------------------------------------------------------
 // Values for sort_order formal parameter below
-const std::array<int,2> ROW_MAJOR = {{0,1}};
-const std::array<int,2> COLUMN_MAJOR = {{1,0}};
+const std::array<int,2> ROW_MAJOR = {0,1};
+const std::array<int,2> COLUMN_MAJOR = {1,0};
 
 template<class IndexT, int RANK>
 struct CmpIndex {
-	std::array<std::vector<IndexT> *, RANK> const indices;
+	std::array<std::vector<IndexT> const *, RANK> indices;
 
 	CmpIndex(
-		std::array<std::vector<IndexT>, RANK> const *_indices,
+		std::array<std::vector<IndexT>, RANK> const &_indices,
 		std::array<int,RANK> const &sort_order)
 	{
 		for (int i=0; i<RANK; ++i)
@@ -82,16 +97,18 @@ public:
 
 private:
 	bool in_edit;		// Are we in edit mode?
-	const std::array<int,RANK> sort_order;	// Non-negative elements if this is sorted
+	std::array<int,RANK> sort_order;	// Non-negative elements if this is sorted
 
 public:
 	CooArray(
 		std::array<size_t, RANK> const &_shape,
 		std::array<std::string, RANK> const &_dims)
-	: shape(_shape), dims(_dims), in_edit(true), sort_order({{-1, -1}}) {}
+	: shape(_shape), dims(_dims), in_edit(true), sort_order() {
+	}
 
 	CooArray(std::array<size_t, RANK> const &_shape)
-	: shape(_shape), in_edit(true), sort_order({{-1, -1}}) {}
+	: shape(_shape), in_edit(true), sort_order() {
+	}
 
 	int rank() { return RANK; }
 
@@ -144,17 +161,21 @@ public:
 		vals.reserve(size);
 	}
 
+#if 0
+Not needed, duplicated below.
 	/** Adds an element to the sparse array. */
 	void add(std::array<IndexT,RANK> const index, ValueT const &val)
 	{
 		for (int k=0; k<RANK; ++k) indices[k].push_back(index[k]);
 		vals.push_back(val);
 	}
-	void add(std::vector<IndexT> const &index, ValueT const &val)
+	void add_v(std::vector<IndexT> const &index, ValueT const &val)
 	{
 		for (int k=0; k<RANK; ++k) indices[k].push_back(index[k]);
 		vals.push_back(val);
 	}
+#endif
+
 
 	// -------------------------------------------------
 	// --------------------------------------------------
@@ -171,9 +192,10 @@ public:
 		bool operator!=(iterator const &rhs) const { return i != rhs.i; }
 		bool operator<(iterator const &rhs) const { return i < rhs.i; }
 		void operator++() { ++i; }
+		ValueT &operator*() { return parent->vals[i]; }
 		ValueT &val() { return parent->vals[i]; }
-
 		IndexT &index(int k) const { return parent->indices[k][i]; }
+
 		std::array<IndexT, RANK> index() const {
 			std::array<size_t, RANK> ret;
 			for (int k=0; k<RANK; ++k) ret[k] = index(k);
@@ -204,7 +226,8 @@ public:
 		bool operator!=(iterator const &rhs) const { return i != rhs.i; }
 		bool operator<(iterator const &rhs) const { return i < rhs.i; }
 		void operator++() { ++i; }
-		ValueT &val() { return parent->vals[i]; }
+		ValueT const &val() { return parent->vals[i]; }
+		ValueT const &operator*() { return parent->vals[i]; }
 
 		IndexT const &index(int k) const { return parent->indices[k][i]; }
 		std::array<IndexT, RANK> index() const {
@@ -233,22 +256,43 @@ public:
 	void edit()
 	{
 		in_edit = true;
-		sort_order = {{-1, -1}};
 	}
 
 	void add(std::array<IndexT, RANK> const index, ValueT const val)
 	{
-		if (in_edit) {
+		if (!in_edit) {
 			sparse_error(-1, "Must be in edit mode to use CooArray::add()");
 		}
+
+		// Check bounds
+		for (int i=0; i<RANK; ++i) {
+			if (index[i] < 0 || index[i] >= shape[i]) {
+				std::ostringstream buf;
+				buf << "Sparse index out of bounds: index=(";
+				for (int j=0; j<RANK; ++j) {
+					buf << index[j];
+					buf << " ";
+				}
+				buf << ") vs. shape=(";
+				for (int j=0; j<RANK; ++j) {
+					buf << shape[j];
+					buf << " ";
+				}
+				buf << ")";
+				sparse_error(-1, buf.str().c_str());
+			}
+		}
+
 		for (int i=0; i<RANK; ++i) indices[i].push_back(index[i]);
 		vals.push_back(val);
 	}
 
+#if 0
+// Not needed: We use consolidate() instead.
 	void sort(std::array<int, 2> const _sort_order)
 	{
 		// Decide on how we'll sort
-		CmpIndex cmp(&indices, _sort_order);
+		CmpIndex<IndexT,RANK> cmp(indices, _sort_order);
 
 		// Generate a permuatation
 		int n = size();
@@ -272,14 +316,15 @@ public:
 		in_edit = false;
 		sort_order = _sort_order;
 	}
+#endif
 
-	void consolidate(std::array<int, RANK> sort_order, DuplicatePolicy duplicate_policy, bool handle_nan = false)
+	void consolidate(std::array<int, RANK> const &_sort_order, DuplicatePolicy duplicate_policy = DuplicatePolicy::ADD, bool handle_nan = false)
 	{
 		// Nothing to do for zero-size matrices (or ones with just one element)
 		if (size() <= 1) return;
 
 		// Decide on how we'll sort
-		CmpIndex cmp(&indices, _sort_order);
+		CmpIndex<IndexT,RANK> cmp(indices, _sort_order);
 
 		// Generate a permuatation
 		int n = size();
@@ -289,10 +334,10 @@ public:
 
 		// Output arrays
 		std::array<std::vector<IndexT>, RANK> nindices;
-		std::vector<ValueT> nval;
+		std::vector<ValueT> nvals;
 
 		// Identify duplicates
-		i = 0;
+		int i = 0;
 		while (vals[perm[i]] == 0 || std::isnan(vals[perm[i]])) ++i;		// Remove nans
 		for (int k=0; k<RANK; ++k) nindices[k].push_back(indices[k][perm[i]]);
 		nvals.push_back(vals[perm[i]]);
@@ -324,15 +369,18 @@ public:
 			}
 
 			// Change over to our new copy (double buffering here)
-			for (int k=0; k<RANK; ++k) indices[k] = std::move(nindices[k])
-			vals = std::move(nindices[vals]);
+			for (int k=0; k<RANK; ++k) indices[k] = std::move(nindices[k]);
+			vals = std::move(nvals);
 		}
 
 		in_edit = false;
-		this->sort_order = sort_order;
+		sort_order = _sort_order;
 	}
 
 #if 0
+// Temporarily comment out NetCDF stuff.
+// Not sure if it belongs in the core class.
+
 	 void netcdf_define(
 		netCDF::NcFile &nc, std::string const &vname,
 		std::vector<std::function<void ()>> &writes) const
@@ -374,10 +422,10 @@ public:
 
 
 template<class IndexT, class ValueT>
-using CooMatrix = CooArray<IndexT, ValueT, 2>
+using CooMatrix = CooArray<IndexT, ValueT, 2>;
 
 template<class IndexT, class ValueT>
-using CooVector = CooArray<IndexT, ValueT, 1>
+using CooVector = CooArray<IndexT, ValueT, 1>;
 
 
 
@@ -845,9 +893,12 @@ public:
 	ValueT &value()
 		{ return val; }
 };
+#endif	// #if 0
+
+
+
 
 } // namespace
-#endif	// #if 0
 
 
 #endif	// #ifndef SPARSESPARSE_H

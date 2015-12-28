@@ -7,6 +7,6 @@ install (FILES
 
 
 # ----------- sparsesparse_c
-add_library(sparsesparse_lib SHARED
+add_library(sparsesparse SHARED
 	sparsesparse.cpp)
-install(TARGETS sparsesparse_lib DESTINATION lib)
+install(TARGETS sparsesparse DESTINATION lib)
