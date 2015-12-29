@@ -10,7 +10,7 @@
 #include <sstream>
 #include <algorithm>
 
-namespace sparsesparse {
+namespace spsparse {
 
 class Exception : public std::exception
 {
@@ -19,7 +19,7 @@ public:
 		{}
 
 	virtual const char* what() const noexcept
-		{ return "sparsesparse::Exception()"; }
+		{ return "spsparse::Exception()"; }
 };
 
 
@@ -573,6 +573,8 @@ static double multiply(
 	CooMatrix<IndexT, ValueT> const &B,
 	CooVector<IndexT, ValueT> const *scalek)
 {
+Compute this in consolidate...?
+Check A and B are consolidated properly...
 	std::vector<size_t> abegin(get_rowcol_beginnings(A, 0));
 	std::vector<size_t> bbegin(get_rowcol_beginnings(B, 1));
 

@@ -1,9 +1,9 @@
 #include <functional>
 #include <cstdlib>
-#include "sparsesparse.hpp"
+#include "spsparse.hpp"
 #include <exception>
 
-namespace sparsesparse {
+namespace spsparse {
 
 void default_error(int retcode, const char *format, ...)
 {
@@ -14,7 +14,7 @@ void default_error(int retcode, const char *format, ...)
 	va_end(arglist);
 	fprintf(stderr, "\n");
 
-	throw sparsesparse::Exception();
+	throw spsparse::Exception();
 //	exit(-1);
 }
 
