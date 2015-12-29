@@ -3,9 +3,44 @@
 
 namespace spsparse {
 
+
+// -----------------------------------------------
+template<class IterT>
+class WrapForwardValIter {
+protected:
+	// http://www.cplusplus.com/reference/iterator/ForwardIterator/
+	IterT ii;
+
+public:
+	WrapForwardValIter(IterT const &_ii) : ii(_ii) {}
+	WrapForwardValIter(IterT const &&_ii) : ii(std::move(_ii)) {}
+
+	bool operator==(WrapForwardValIter<IterT> const &other)
+		{ return ii == other.ii; }
+	bool operator!=(WrapForwardValIter<IterT> const &other)
+		{ return ii != other.ii; }
+
+	auto operator*() -> decltype(*ii)
+		{ return *ii; }
+//	auto operator->*() -> decltype(*ii)
+//		{ return ii.operator->*(); }
+
+	auto val() -> decltype(ii.val())
+		{ return ii.val(); }
+
+	void operator++()
+		{ ++ii; }
+
+//	auto operator++(int) -> delctype(ii++)	// postfix
+//		{ return ii++; }
+
+};
+
+// -----------------------------------------------
 /** Convert standard STL iterator into our XIter. */
 template<class STLIter>
 class STLXiter {
+protected:
 	STLIter const begin;
 	STLIter ii;
 	STLIter const end;
@@ -27,6 +62,19 @@ public:
 	auto operator*() -> decltype(*ii)
 		{ return *ii; }
 };
+
+/** Works for iterators with .val() method */
+template<class ValSTLIter>
+class ValSTLXiter : public STLXiter<ValSTLIter>
+{
+	ValSTLXiter(ValSTLIter const &_begin, ValSTLIter const &_end) :
+		STLXiter<ValSTLIter>(_begin, _end) {}
+
+	auto val() -> decltype(STLXiter<ValSTLIter>::ii.val())
+		{ return STLXiter<ValSTLIter>::ii.val(); }
+};
+// --------------------------------------------------------
+
 // --------------------------------------------------------
 
 #if 0

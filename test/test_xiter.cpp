@@ -1,10 +1,10 @@
 // https://github.com/google/googletest/blob/master/googletest/docs/Primer.md
 
 #include <gtest/gtest.h>
-#include <xiter.hpp>
+#include <spsparse/xiter.hpp>
 #include <iostream>
 
-using namespace sparsesparse;
+using namespace spsparse;
 
 // The fixture for testing class Foo.
 class XiterTest : public ::testing::Test {

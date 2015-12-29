@@ -1,12 +1,11 @@
 # ------------ Header Files
 
-install (FILES
-	${CMAKE_CURRENT_SOURCE_DIR}/sparsesparse.hpp
-	${CMAKE_CURRENT_BINARY_DIR}/xiter.hpp
-         DESTINATION include)
+# install SpSparse headers
+install(DIRECTORY ${PROJECT_SOURCE_DIR}/slib/ DESTINATION include
+          FILES_MATCHING PATTERN "*.hpp")
 
-
-# ----------- sparsesparse_c
-add_library(sparsesparse SHARED
-	sparsesparse.cpp)
-install(TARGETS sparsesparse DESTINATION lib)
+# ----------- spsparse_c
+add_library(spsparse SHARED
+	${EVERYTRACE_REFADDR}	# Blank if not USE_EVERYTRACE
+	spsparse/spsparse.cpp)
+install(TARGETS spsparse DESTINATION lib)
