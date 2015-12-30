@@ -53,6 +53,28 @@ TEST_F(SpSparseTest, CooArray) {
 	} catch(...) {
 		FAIL() << "Excpected spsparse::Exception";
 	}
+
+	// Test Move Constructor
+	CooArray<int, double, 1> arr2(std::move(arr1));
+	EXPECT_EQ(2, arr2.size());
+	EXPECT_EQ(1, arr2.index(0, 0));
+	EXPECT_EQ(3, arr2.index(0,1));
+	EXPECT_EQ(2., arr2.val(0));
+}
+
+/** Check that we can get sorted permutations properly. */
+TEST_F(SpSparseTest, permutation) {
+	CooArray<int, double, 2> arr2({2,4});
+	arr2.add({1,3}, 5.);
+	arr2.add({1,2}, 3.);
+	arr2.add({0,3}, 17.);
+
+	std::vector<size_t> perm0(sorted_permutation(arr2, {0,1}));
+	EXPECT_EQ(perm0, std::vector<size_t>({2,1,0}));
+
+	std::vector<size_t> perm1(sorted_permutation(arr2, {1,0}));
+	EXPECT_EQ(perm1, std::vector<size_t>({1,2,0}));
+
 }
 
 TEST_F(SpSparseTest, consolidate) {
@@ -61,34 +83,108 @@ TEST_F(SpSparseTest, consolidate) {
 	arr2.add({1,3}, 5.);
 	arr2.add({1,2}, 3.);
 	arr2.add({0,3}, 17.);
+	arr2.add({0,1}, 14.);
 	arr2.add({1,2}, 15.);
 
+	// Consolidate row major
 	CooArray<int, double, 2> arr3(arr2.shape);
-printf("-------------------- consolidate\n");
+	consolidate(arr3, arr2, {0,1});
+	EXPECT_EQ(4, arr3.size());
+
+
+	EXPECT_EQ(std::vector<int>({0,0,1,1}), blitz_to_vector(arr3.indices(0)));
+	EXPECT_EQ(std::vector<int>({1,3,2,3}), blitz_to_vector(arr3.indices(1)));	// j
+	EXPECT_EQ(std::vector<double>({14., 17., 18., 5.}), blitz_to_vector(arr3.vals()));
+
+	EXPECT_EQ(std::vector<size_t>({0,2,4}), dim_beginnings(arr3));
+
+
+	// Clear it out
+	arr3.clear();
+	EXPECT_EQ(0, arr3.size());
+
+	// Consolidate column-major
 	consolidate(arr3, arr2, {1,0});
+	EXPECT_EQ(std::vector<int>({0,1,0,1}), blitz_to_vector(arr3.indices(0)));
+	EXPECT_EQ(std::vector<int>({1,2,3,3}), blitz_to_vector(arr3.indices(1)));	// j
+	EXPECT_EQ(std::vector<double>({14., 18., 17., 5.}), blitz_to_vector(arr3.vals()));
+	EXPECT_EQ(std::vector<size_t>({0,1,2,4}), dim_beginnings(arr3));
 
-	EXPECT_EQ(3, arr3.size());
+}
 
-printf("AA1\n");
-	EXPECT_EQ(std::vector<int>({0,1,1}), blitz_to_vector(arr2.indices(0)));
-	EXPECT_EQ(std::vector<int>({3,2,3}), blitz_to_vector(arr2.indices(1)));	// j
-	EXPECT_EQ(std::vector<double>({17., 18., 5.}), blitz_to_vector(arr2.vals()));
+TEST_F(SpSparseTest, iterators) {
+	CooArray<int, double, 2> arr2({2,4});
+	arr2.add({1,3}, 5.);
+	arr2.add({1,2}, 3.);
+	arr2.add({0,3}, 17.);
+	arr2.add({1,2}, 15.);
 
 	// Try out iterators a bit
 	auto ii(arr2.begin());
 	EXPECT_NE(ii, arr2.end());
-	EXPECT_EQ(0, ii.index(0));
+	EXPECT_EQ(1, ii.index(0));
 	EXPECT_EQ(3, ii.index(1));
-	EXPECT_EQ(17., ii.val());
-	std::array<int,2> arr({0,3});
+	EXPECT_EQ(5., ii.val());
+	std::array<int,2> arr({1,3});
 	EXPECT_EQ(arr, *ii);
 	++ii;
 	EXPECT_NE(ii, arr2.end());
 	EXPECT_EQ(1, ii.index(0));
 	EXPECT_EQ(2, ii.index(1));
-	EXPECT_EQ(18., ii.val());
+	EXPECT_EQ(3., ii.val());
 
 }
+
+TEST_F(SpSparseTest, dim_beginnings_iterators)
+{
+	typedef CooArray<int, double, 2> CooArrayT;
+	CooArrayT arr2({20,10});
+
+
+	arr2.add({1,0}, 15.);
+	arr2.add({1,3}, 17.);
+	arr2.add({2,4}, 17.);
+	arr2.add({6,4}, 10.);
+
+	CooArrayT arr3(arr2.shape);
+	consolidate(arr3, arr2, {0,1});
+
+	auto abegin(dim_beginnings(arr3));
+	auto dbi(DimBeginningsXiter<CooArrayT>(&arr3, 0, 1, abegin.begin(), abegin.end()));
+
+	// First row
+	EXPECT_EQ(1, *dbi);
+	auto ii1(dbi.sub_xiter());
+	EXPECT_EQ(0, *ii1);
+	EXPECT_EQ(15., ii1.val());
+	EXPECT_EQ(false, ii1.eof());
+	++ii1;
+	EXPECT_EQ(3, *ii1);
+	EXPECT_EQ(17., ii1.val());
+	EXPECT_EQ(false, ii1.eof());
+	++ii1;
+	EXPECT_EQ(true, ii1.eof());
+
+	// Next row
+	++dbi;
+	EXPECT_EQ(2, *dbi);
+	auto ii2(dbi.sub_xiter());
+	EXPECT_EQ(4, *ii2);
+	EXPECT_EQ(false, ii2.eof());
+	++ii2;
+	EXPECT_EQ(true, ii2.eof());
+
+	// Next row
+	++dbi;
+	EXPECT_EQ(6, *dbi);
+	auto ii6(dbi.sub_xiter());
+	EXPECT_EQ(4, *ii6);
+	EXPECT_EQ(false, ii6.eof());
+	++ii6;
+	EXPECT_EQ(true, ii6.eof());
+
+}
+
 
 int main(int argc, char **argv) {
 #ifdef USE_EVERYTRACE

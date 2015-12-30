@@ -15,3 +15,8 @@ add_test(AllTests test_xiter)
 add_executable(test_array test_array.cpp)
 target_link_libraries(test_array ${ALL_LIBS})
 add_test(AllTests test_array)
+
+add_executable(test_multiply_sparse test_multiply_sparse.cpp)
+target_link_libraries(test_multiply_sparse ${ALL_LIBS})
+add_test(AllTests test_multiply_sparse)
+

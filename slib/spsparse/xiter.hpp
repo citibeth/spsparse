@@ -7,11 +7,12 @@ namespace spsparse {
 // -----------------------------------------------
 template<class IterT>
 class WrapForwardValIter {
-protected:
+public:
+	typedef typename IterT::value_type value_type;
+
 	// http://www.cplusplus.com/reference/iterator/ForwardIterator/
 	IterT ii;
 
-public:
 	WrapForwardValIter(IterT const &_ii) : ii(_ii) {}
 	WrapForwardValIter(IterT const &&_ii) : ii(std::move(_ii)) {}
 
@@ -40,11 +41,11 @@ public:
 /** Convert standard STL iterator into our XIter. */
 template<class STLIter>
 class STLXiter {
-protected:
+public:
 	STLIter const begin;
 	STLIter ii;
 	STLIter const end;
-public:
+
 	typedef typename STLIter::value_type value_type;
 
 	STLXiter(STLIter const &_begin, STLIter const &_end) :
@@ -67,23 +68,30 @@ public:
 template<class ValSTLIter>
 class ValSTLXiter : public STLXiter<ValSTLIter>
 {
+public:
+
 	ValSTLXiter(ValSTLIter const &_begin, ValSTLIter const &_end) :
 		STLXiter<ValSTLIter>(_begin, _end) {}
 
 	auto val() -> decltype(STLXiter<ValSTLIter>::ii.val())
-		{ return STLXiter<ValSTLIter>::ii.val(); }
+		{ return this->ii.val(); }
 };
 // --------------------------------------------------------
 
 // --------------------------------------------------------
 
-#if 0
 // http://stackoverflow.com/questions/984394/why-not-infer-template-parameter-from-constructor
-template<class STLIter>
-STLXiter<STLIter> make_stl_xiter(typename STLIter::value_type const &_begin, typename STLIter::value_type const &_end)
-	{ return STLXiter<STLIter>(_begin, _end); }
 
-#endif
+template<class STLIter>
+STLXiter<STLIter> make_xiter(
+	STLIter **_begin, STLIter &&_end)
+{ return STLXiter<STLIter>(std::move(_begin), std::move(_end)); }
+
+template<class ValSTLIter>
+ValSTLXiter<ValSTLIter> make_val_xiter(
+	ValSTLIter &&_begin, ValSTLIter &&_end)
+{ return ValSTLXiter<ValSTLIter>(std::move(_begin), std::move(_end)); }
+
 
 // -------------------------------------------------------
 
@@ -112,6 +120,7 @@ public:
 	}
 
 	Join3Xiter(Xiter1T &&_i1, Xiter2T &&_i2, Xiter3T &&_i3) :
+		next_match(0),
 		i1(std::move(_i1)),
 		i2(std::move(_i2)),
 		i3(std::move(_i3))

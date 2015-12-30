@@ -7,6 +7,7 @@
 #include <vector>
 #include <cmath>
 #include <string>
+#include <iostream>
 #include <sstream>
 #include <algorithm>
 
@@ -51,44 +52,203 @@ so that operator*() produces the index in that dimension. */
 template<class IterT>
 class DimIndexIter : public WrapForwardValIter<IterT>
 {
-	int dim;
-
 public:
+	typedef typename WrapForwardValIter<IterT>::value_type value_type;
+	const int dim;
+
 	typedef WrapForwardValIter<IterT> WrapT;
+	// Export as is standard with STL
 
-	DimIndexIter(IterT const &_ii, int _dim) : WrapT(_ii), dim(_dim) {}
-	DimIndexIter(IterT const &&_ii, int _dim) : WrapT(std::move(_ii)), dim(_dim) {}
+	DimIndexIter(int _dim, IterT const &_ii) : WrapT(_ii), dim(_dim) {}
+	DimIndexIter(int _dim, IterT const &&_ii) : WrapT(std::move(_ii)), dim(_dim) {}
 
-	auto operator*() -> decltype(WrapForwardValIter<IterT>::ii.index(dim))
-		{ return WrapForwardValIter<IterT>::ii.index(dim); }
+	value_type operator*()
+		{ return this->ii.index(dim); }
 };
 
 // -----------------------------------------------------
+/** A must be sorted properly.
+See: CooArray::consolidate() */
+template<class CooArrayT>
+std::vector<size_t> dim_beginnings(CooArrayT const &A)
+{
+	const int RANK = CooArrayT::rank;
 
-template<class IndexT, class ValT, int _RANK>
+	std::vector<size_t> abegin;
+
+	// Check that we're sorted by SOME dimension.
+	if (A.sort_order[0] < 0) {
+		(*sparse_error)(-1, "dim_beginnings() required the CooArray is sorted first.");
+	}
+
+	// Get beginning of each row in a (including sentinel at end)
+	auto ai(A.begin());
+	auto const end(A.end());
+	if (ai != end) {		// At least 1 element
+		abegin.push_back(ai.offset());			// First item in array is always 0
+		int const dim = A.sort_order[0];		// Dimension we're sectioning by
+		int last_row = ai.index(dim);
+
+		for (++ai; ; ++ai) {
+			if (ai == end) {
+				// Add a sential row
+				abegin.push_back(ai.offset());
+				break;
+			}
+			if (ai.index(dim) != last_row) {
+				// We see a new row!
+				abegin.push_back(ai.offset());
+				last_row = ai.index(dim);
+			}
+		}
+	}
+
+	return abegin;
+}
+// ----------------------------------------------------------
+/** Iterates over one row/col at a time (in general, one index in a dimension).
+The underlying array must be sorted by that dimension. */
+template<class CooArrayT>
+class DimBeginningsXiter : public STLXiter<std::vector<size_t>::iterator>
+{
+public:
+
+	typedef typename CooArrayT::index_type IndexT;
+	typedef typename CooArrayT::val_type ValueT;
+	int const RANK = CooArrayT::rank;
+	typedef std::vector<size_t>::iterator DimIterT;
+
+protected:
+	CooArrayT *arr;
+	int index_dim;	// Dimension corresponding to our "rows"
+	int val_dim;	// Dimension corresponding to our "cols"
+
+public:
+	DimBeginningsXiter(
+		CooArrayT *_arr,
+		int _index_dim, int _val_dim,
+		DimIterT const &dim_beginnings_begin,
+		DimIterT const &dim_beginnings_end)
+	: STLXiter<std::vector<size_t>::iterator>(dim_beginnings_begin, dim_beginnings_end),
+		arr(_arr), index_dim(_index_dim), val_dim(_val_dim)
+	{}
+
+	IndexT operator*()
+		{ return arr->index(index_dim, *ii); }
+
+	/** Returns an Xiter along the current row/col in the CooArray. */
+	typedef ValSTLXiter<typename CooArrayT::dim_iterator> SubXiterT;
+	SubXiterT sub_xiter(int _val_dim = -1)
+	{
+		if (_val_dim < 0) _val_dim = val_dim;
+		size_t a0 = *ii;
+		size_t a1 = *(ii + 1);
+		return SubXiterT(arr->dim_iter(_val_dim, a0), arr->dim_iter(_val_dim, a1));
+	}
+
+	// No val()
+};
+// -----------------------------------------------------
+template<class CooArrayT, class AccumulatorT>
+void consolidate(AccumulatorT &ret,
+	CooArrayT const &A,
+	std::array<int, CooArrayT::rank> const &sort_order,
+	DuplicatePolicy duplicate_policy = DuplicatePolicy::ADD,
+	bool handle_nan = false)	// TODO: This is currently ignored!
+{
+	const int RANK = CooArrayT::rank;
+	typedef typename CooArrayT::index_type IndexT;
+	typedef typename CooArrayT::val_type ValT;
+
+	// Nothing to do for zero-size matrices (or ones with just one element)
+	if (A.size() > 1) {
+
+		// Get a sorted permutation
+		std::vector<size_t> perm(sorted_permutation(A, sort_order));
+
+		// Scan through to identify duplicates
+		auto ii(perm.begin());
+
+		// Skip over initial 0 and NaN
+		for (;; ++ii) {
+			if (ii == perm.end()) goto finished;		// Nothing more to do
+			if (!std::isnan(A.val(*ii)) && A.val(*ii) != 0) break;
+		}
+
+		// New temporary entry
+		std::array<IndexT,RANK> accum_idx(A.index(*ii));
+		ValT accum_val = A.val(*ii);
+		++ii;
+
+		for (; ; ++ii) {
+			// Skip over initial 0 and NaN
+			for (;; ++ii) {
+				if (ii == perm.end()) {
+					// Write out the last thing we had in our accumulator
+					ret.add(accum_idx, accum_val);
+
+					goto finished;		// Nothing more to do
+				}
+				if (!std::isnan(A.val(*ii)) && A.val(*ii) != 0) break;
+			}
+
+			// Test if A.index(*ii) == accum_idx
+			auto new_idx = A.index(*ii);
+			for (int k=0; k<RANK; ++k) {
+				if (new_idx[k] != accum_idx[k]) {
+					// They don't match.  Write out our accumulator, and reset to this one
+					ret.add(accum_idx, accum_val);
+					accum_idx = new_idx;
+					accum_val = A.val(*ii);
+					goto continue_outer;
+				}
+			}
+
+			// They do match!  Add it into the accumulator...
+			if (duplicate_policy == DuplicatePolicy::ADD)
+				accum_val += A.val(*ii);
+			else if (duplicate_policy == DuplicatePolicy::REPLACE)
+				accum_val = A.val(*ii);
+
+		continue_outer: ;
+		}
+	}
+finished:
+
+
+	ret.set_sorted(sort_order);
+}
+// -----------------------------------------------------
+template<class IndexT, class ValT, int RANK>
 class CooArray
 {
 public:
-	static const int RANK = _RANK;
 	static const int rank = RANK;
 	typedef IndexT index_type;
 	typedef ValT val_type;
 
 	std::array<size_t, RANK> const shape;		// Extent of each dimension
 
-
 protected:
 	typedef CooArray<IndexT, ValT, RANK> ThisCooArrayT;
-
 	std::array<std::vector<IndexT>, RANK> index_vecs;
 	std::vector<ValT> val_vec;
 
-	bool in_edit;		// Are we in edit mode?
-	std::array<int,RANK> sort_order;	// Non-negative elements if this is sorted
+	// OPTIONAL
+	// If sort_order[0] != -1, this is the index of the beginning of
+	// each different value of dimension sort_order[0] (i.e. beginning
+	// of each row, if we're sorted row-major).
+	bool dim_beginnings_set;
+	std::vector<size_t> _dim_beginnings;
 
 public:
+	bool edit_mode;		// Are we in edit mode?
+	std::array<int,RANK> sort_order;	// Non-negative elements if this is sorted
+
+
+
 	CooArray(std::array<size_t, RANK> const &_shape)
-	: shape(_shape), in_edit(true), sort_order() {
+	: shape(_shape), edit_mode(true), dim_beginnings_set(false), sort_order() {
 		sort_order[0] = -1;
 	}
 
@@ -105,7 +265,6 @@ public:
 	std::array<IndexT, RANK> index(int ix) const {
 		std::array<IndexT, RANK> ret;
 		for (int k=0; k<RANK; ++k) ret[k] = index(k, ix);
-printf("ret=%d %d\n", ret[0], ret[1]);
 		return ret;
 	}
 	std::vector<IndexT> index_vec(int ix) const {
@@ -126,14 +285,20 @@ printf("ret=%d %d\n", ret[0], ret[1]);
 		shape(other.shape),
 		index_vecs(std::move(other.index_vecs)),
 		val_vec(std::move(other.val_vec)),
-		in_edit(other.in_edit),
+		dim_beginnings_set(other.dim_beginnings_set),
+		_dim_beginnings(std::move(other._dim_beginnings)),
+		edit_mode(other.edit_mode),
 		sort_order(other.sort_order) {}
 
 	void operator=(ThisCooArrayT &&other) {
-		shape = other.shape;
+		if (shape != other.shape) {
+			(*sparse_error)(-1, "Cannot change shape on assignment.");
+		}
 		index_vecs = std::move(other.index_vecs);
 		val_vec = std::move(other.val_vec);
-		in_edit = other.in_edit;
+		dim_beginnings_set = other.dim_beginnings_set;
+		_dim_beginnings = std::move(other._dim_beginnings);
+		edit_mode = other.edit_mode;
 		sort_order = other.sort_order;
 	}
 
@@ -142,14 +307,20 @@ printf("ret=%d %d\n", ret[0], ret[1]);
 		shape(other.shape),
 		index_vecs(other.index_vecs),
 		val_vec(other.val_vec),
-		in_edit(other.in_edit),
+		dim_beginnings_set(other.dim_beginnings_set),
+		_dim_beginnings(other._dim_beginnings),
+		edit_mode(other.edit_mode),
 		sort_order(other.sort_order) {}
 
 	void operator=(ThisCooArrayT const &other) {
-		shape = other.shape;
+		if (shape != other.shape) {
+			(*sparse_error)(-1, "Cannot change shape on assignment.");
+		}
 		index_vecs = other.index_vecs;
 		val_vec = other.val_vec;
-		in_edit = other.in_edit;
+		dim_beginnings_set = other.dim_beginnings_set;
+		_dim_beginnings = other._dim_beginnings;
+		edit_mode = other.edit_mode;
 		sort_order = other.sort_order;
 	}
 
@@ -161,6 +332,9 @@ printf("ret=%d %d\n", ret[0], ret[1]);
 	void clear() {
 		for (int k=0; k<RANK; ++k) index_vecs[k].clear();
 		val_vec.clear();
+		dim_beginnings_set = false;
+		_dim_beginnings.clear();
+		edit_mode = true;
 	}
 
 	void reserve(size_t size) {
@@ -168,28 +342,12 @@ printf("ret=%d %d\n", ret[0], ret[1]);
 		val_vec.reserve(size);
 	}
 
-#if 0
-Not needed, duplicated below.
-	/** Adds an element to the sparse array. */
-	void add(std::array<IndexT,RANK> const index, ValT const &val)
-	{
-		for (int k=0; k<RANK; ++k) index_vecs[k].push_back(index[k]);
-		val_vec.push_back(val);
-	}
-	void add_v(std::vector<IndexT> const &index, ValT const &val)
-	{
-		for (int k=0; k<RANK; ++k) index_vecs[k].push_back(index[k]);
-		val_vec.push_back(val);
-	}
-#endif
-
-
 	// -------------------------------------------------
 	// --------------------------------------------------
 	/** Standard STL-type iterator for iterating through a VectorSparseMatrix. */
 	class iterator {
 	protected:
-		ThisCooArrayT *parent;
+		ThisCooArrayT * const parent;
 		size_t i;
 	public:
 		typedef IndexT value_type;	// Standard STL: Type we get upon operator*()
@@ -206,6 +364,48 @@ Not needed, duplicated below.
 		IndexT index(int k) const { return parent->index(k,i); }
 		std::array<IndexT, RANK> operator*() const { return index(); }
 		ValT &val() { return parent->val(i); }
+		ValT val() const { return parent->val(i); }
+
+
+		std::array<IndexT, RANK> index() const
+			{ return parent->index(i); }
+		std::vector<IndexT> index_vec() const
+			{ return parent->index_vec(i); }
+	};
+
+	// -------------------------------------------------
+	iterator iter(size_t ix) { return iterator(this, ix); }
+	iterator begin() { return iter(0); }
+	iterator end() { return iter(size()); }
+
+	typedef DimIndexIter<iterator> dim_iterator;
+	dim_iterator dim_iter(int dim, size_t ix)
+		{ return dim_iterator(dim, iter(ix)); }
+	dim_iterator dim_begin(int dim)
+		{ return dim_iter(dim, 0); }
+	dim_iterator dim_end(int dim)
+		{ return dim_iter(dim, size()); }
+
+
+	// -------------------------------------------------
+	class const_iterator {
+	protected:
+		ThisCooArrayT const * const parent;
+		size_t i;
+	public:
+		typedef IndexT value_type;	// Standard STL: Type we get upon operator*()
+		typedef ValT val_type;	// Extension: Type we get upon val()
+
+		const_iterator(ThisCooArrayT const *p, size_t _i) : parent(p), i(_i) {}
+
+		size_t offset() const { return i; }
+		bool operator==(const_iterator const &rhs) const { return i == rhs.i; }
+		bool operator!=(const_iterator const &rhs) const { return i != rhs.i; }
+		bool operator<(const_iterator const &rhs) const { return i < rhs.i; }
+		void operator++() { ++i; }
+		IndexT index(int k) const { return parent->index(k,i); }
+		ValT val() const { return parent->val(i); }
+		std::array<IndexT, RANK> operator*() const { return index(); }
 
 
 		std::array<IndexT, RANK> index() const
@@ -213,77 +413,38 @@ Not needed, duplicated below.
 		std::vector<IndexT> index_vec() const
 			{ return parent->index_vec(i); }
 
-		// Convenience methods
-		IndexT &row() const { return index(0); }
-		IndexT &col() const { return index(1); }
-		ValT &value() { return val(); }
 	};
 
-	iterator iter(size_t ix) { return iterator(this, ix); }
-	iterator begin() { return iterator(this, 0); }
-	iterator end() { return iterator(this, val_vec.size()); }
+	// -------------------------------------------------
 
-	typedef DimIndexIter<iterator> dim_iterator;
-	iterator dim_iter(size_t ix, int dim)
-		{ return dim_iterator(iter(ix), dim); }
-	iterator dim_begin(int dim)
-		{ return dim_iterator(begin(), dim); }
-	iterator dim_end(int dim)
-		{ return dim_iterator(end(), dim); }
+	const_iterator iter(size_t ix) const { return const_iterator(this, ix); }
+	const_iterator begin() const { return iter(0); }
+	const_iterator end() const { return iter(size()); }
 
-	// --------------------------------------------------
-#if 0
-// No const_iterator for now, until we're more settled. 
+	typedef DimIndexIter<const_iterator> const_dim_iterator;
+	const_dim_iterator dim_iter(int dim, size_t ix) const
+		{ return const_dim_iterator(dim, iter(ix)); }
+	const_dim_iterator dim_begin(int dim) const
+		{ return dim_iter(dim, 0); }
+	const_dim_iterator dim_end(int dim) const
+		{ return dim_iterator(dim, size()); }
 
-	class const_iterator {
-	protected:
-		ThisCooArrayT const *parent;
-		size_t i;
-	public:
-		const_iterator(ThisCooArrayT *p, size_t _i) : parent(p), i(_i) {}
-		size_t offset() const { return i; }
-		bool operator==(iterator const &rhs) const { return i == rhs.i; }
-		bool operator!=(iterator const &rhs) const { return i != rhs.i; }
-		bool operator<(iterator const &rhs) const { return i < rhs.i; }
-		void operator++() { ++i; }
-		std::array<IndexT, RANK> operator*() const { return index(); }
-		ValT const &val() { return parent->val(i); }
-
-		IndexT const &index(int k) const { return parent->index(k,i); }
-		std::array<IndexT, RANK> index() const {
-			std::array<size_t, RANK> ret;
-			for (int k=0; k<RANK; ++k) ret[k] = index(k);
-			return ret;
-		}
-		std::vector<IndexT> index_vec() const {
-			std::vector<size_t> ret;
-			for (int k=0; k<RANK; ++k) ret.push_back(index(k));
-			return ret;
-		}
+	// -------------------------------------------------
 
 
-		// Convenience methods
-		IndexT const &row() const { return index(0); }
-		IndexT const &col() const { return index(1); }
-		ValT const &value() { return val(); }
-	};
-	iterator operator[](size_t ix) const { return const_iterator(this, ix); }
-	iterator begin() const { return const_iterator(this, 0); }
-	iterator end() const { return const_iterator(this, val_vec.size()); }
-#endif
-	// --------------------------------------------------
+
+
 
 	// -------------------------------------------------
 	/** Goes in to add mode: legal to add more things to the vector. */
 	void edit()
 	{
-		in_edit = true;
+		edit_mode = true;
 	}
 
 	void add(std::array<IndexT, RANK> const index, ValT const val)
 	{
-
-		if (!in_edit) {
+		if (!edit_mode) {
 			(*sparse_error)(-1, "Must be in edit mode to use CooArray::add()");
 		}
 
@@ -314,11 +475,49 @@ Not needed, duplicated below.
 	void set_sorted(std::array<int,RANK> _sort_order)
 	{
 		sort_order = _sort_order;
-		in_edit = false;
+		edit_mode = false;
+	}
+
+	// --------------------------------------------------
+	// In-place algos
+	void consolidate(
+		std::array<int, RANK> const &sort_order,
+		DuplicatePolicy duplicate_policy = DuplicatePolicy::ADD,
+		bool handle_nan = false)
+	{
+		ThisCooArrayT ret(shape);
+		spsparse::consolidate(ret, *this, sort_order, duplicate_policy, handle_nan);
+		*this = std::move(ret);
+	}
+
+	std::vector<size_t> &dim_beginnings()
+	{
+		// See if we need to compute it; lazy eval
+		if (!dim_beginnings_set) {
+			this->_dim_beginnings = spsparse::dim_beginnings(*this);
+			dim_beginnings_set = true;
+		}
+		return _dim_beginnings;
+	}
+
+	DimBeginningsXiter<ThisCooArrayT> dim_beginnings_xiter()
+	{
+		auto &db(dim_beginnings());
+		int const index_dim = sort_order[0];
+		int const val_dim = sort_order[1];
+		return DimBeginningsXiter<ThisCooArrayT>(this, index_dim, val_dim, db.begin(), db.end());
 	}
 
 
+	friend std::ostream &::operator<<(std::ostream &os, CooArray<IndexT, ValT, RANK> const &A);
+
+};
+
+
+
+
 #if 0
+// These need to move outside of the CooArray class.
 // Temporarily comment out NetCDF stuff.
 // Not sure if it belongs in the core class.
 
@@ -359,7 +558,6 @@ Not needed, duplicated below.
 		}
 	}
 #endif
-};
 
 
 template<class IndexT, class ValT>
@@ -368,20 +566,30 @@ using CooMatrix = CooArray<IndexT, ValT, 2>;
 template<class IndexT, class ValT>
 using CooVector = CooArray<IndexT, ValT, 1>;
 
-
-
-
-
-
+// -----------------------------------------------------------
+template<class CooArrayT, class AccumulatorT>
+void transpose(AccumulatorT &ret, CooArrayT const &A, std::array<int,CooArrayT::rank> perm)
+{
+	std::array<int,CooArrayT::rank> idx;
+	for (auto ii=A.begin(); ii != A.end(); ++ii) {
+		for (int new_k=0; new_k < CooArrayT::rank; ++new_k) {
+			int old_k = perm[new_k];
+			idx[new_k] = ii.index(old_k);
+		}
+		ret.add(idx, A.val());
+	}
+}
+// -----------------------------------------------------------
 template<class CooArrayT>
 struct CmpIndex {
-	const int RANK = CooArrayT::RANK;
+	const int RANK = CooArrayT::rank;
 
 	CooArrayT const *arr;
-	int const *sort_order;
+	std::array<int, CooArrayT::rank> sort_order;
 
-	CmpIndex(CooArrayT const *_arr, int const *_sort_order) :
-	arr(_arr), sort_order(_sort_order) {}
+	CmpIndex(CooArrayT const *_arr,
+		std::array<int, CooArrayT::rank> const &_sort_order)
+	: arr(_arr), sort_order(_sort_order) {}
 
 	bool operator()(int i, int j)
 	{
@@ -395,129 +603,57 @@ struct CmpIndex {
 	}
 };
 
-template<class CooArrayT, class AccumulatorT>
-void consolidate(AccumulatorT &ret,
-	CooArrayT const A,
-	std::array<int, CooArrayT::rank> const &_sort_order,
-	DuplicatePolicy duplicate_policy = DuplicatePolicy::ADD,
-	bool handle_nan = false)
+template<class CooArrayT>
+std::vector<size_t> sorted_permutation(CooArrayT const &A,
+	std::array<int, CooArrayT::rank> const &sort_order)
 {
-	const int RANK = CooArrayT::rank;
-	typedef typename CooArrayT::index_type IndexT;
-	typedef typename CooArrayT::val_type ValT;
+	// Decide on how we'll sort
+	CmpIndex<CooArrayT> cmp(&A, sort_order);
 
-	// Nothing to do for zero-size matrices (or ones with just one element)
-	if (A.size() > 1) {
+	// Generate a permuatation
+	int n = A.size();
+	std::vector<size_t> perm; perm.reserve(n);
+	for (int i=0; i<n; ++i) perm.push_back(i);
 
-		// Decide on how we'll sort
-		CmpIndex<CooArrayT> cmp(&A, &_sort_order[0]);
+	// Sort the permutation
+	std::stable_sort(perm.begin(), perm.end(), cmp);
 
-		// Generate a permuatation
-		int n = A.size();
-		std::vector<int> perm; perm.reserve(n);
-		for (int i=0; i<n; ++i) perm.push_back(i);
-		std::stable_sort(perm.begin(), perm.end(), cmp);
-
-		// Scan through to identify duplicates
-		auto ii(perm.begin());
-
-		// Skip over initial 0 and NaN
-		for (;; ++ii) {
-			if (ii == perm.end()) goto finished;		// Nothing more to do
-			if (!std::isnan(A.val(*ii)) && A.val(*ii) != 0) break;
-		}
-
-		// New temporary entry
-		std::array<IndexT,RANK> accum_idx(A.index(*ii));
-		ValT accum_val = A.val(*ii);
-		++ii;
-
-		for (; ; ++ii) {
-			// Skip over initial 0 and NaN
-			for (;;) {
-				if (ii == perm.end()) goto finished;		// Nothing more to do
-				if (!std::isnan(A.val(*ii)) && A.val(*ii) != 0) break;
-			}
-
-			// Test if A.index(*ii) == accum_idx
-			auto new_idx = A.index(*ii);
-			for (int k=0; k<RANK; ++k) {
-				if (new_idx[k] != accum_idx[k]) {
-					// They don't match.  Add our accumulator, and reset to this one
-					ret.add(accum_idx, accum_val);
-					accum_idx = new_idx;
-					accum_val = A.val(*ii);
-				}
-			}
-
-			// They do match!  Add it into the accumulator...
-			if (duplicate_policy == DuplicatePolicy::ADD)
-				accum_val += A.val(*ii);
-			else if (duplicate_policy == DuplicatePolicy::REPLACE)
-				accum_val = A.val(*ii);
-
-		continue_outer: ;
-		}
-	}
-
-finished:
-	ret.set_sorted(_sort_order);
+	return perm;
 }
+
+
 // ---------------------------------------------
 
-
-
-/** A must be sorted properly.
-See: CooArray::consolidate() */
-template<class CooArrayT, class AccumulatorT>
-std::vector<size_t> dim_beginnings(CooArrayT const &A)
+#if 0
+template<class CooArrayT>
+DimBeginningsXiter<CooArrayT> dim_beginnings_xiter(
+	CooArrayT *_arr,
+	int _index_dim, int _val_dim,
+	std::vector<size_t>::iterator const &dim_beginnings_begin,
+	std::vector<size_t>::iterator const &dim_beginnings_end)
 {
-	const int RANK = CooArrayT::RANK;
-
-	std::vector<int> abegin;
-
-	// Check that we're sorted by SOME dimension.
-	if (A.sort_order[0] < 0) {
-		(*sparse_error)(-1, "CooArray::get_dim_beginnings() required the CooArray is sorted first.");
-	}
-
-	// Get beginning of each row in a (including sentinel at end)
-	auto ai(A.begin());
-	auto const end(A.end());
-	if (ai != end) {		// At least 1 element
-		int const dim = A.sort_order[0];		// Dimension we're sectioning by
-		int last_row = ai.index(dim);
-
-		for (++ai; ; ++ai) {
-			if (ai == end) {
-				// Add a sential row
-				abegin.push_back(ai.offset());
-				break;
-			}
-			if (ai.index(dim) != last_row) {
-				// We see a new row!
-				abegin.push_back(ai.offset());
-				last_row = ai.index(dim);
-			}
-		}
-	}
-
-	return abegin;
+	return DimBeginningsXiter<CooArrayT>(_arr, _index_dim, _val_dim, dim_beginnings_begin, dim_beginnings_end);
 }
-
-
-
-
-
-
-
-
-
-
-
+#endif
+// ----------------------------------------------------------
+// ----------------------------------------------------------
 
 
 
 }	// Namespace
+
+template<class IndexT, class ValT, int RANK>
+std::ostream &operator<<(std::ostream &os, spsparse::CooArray<IndexT, ValT, RANK> const &A)
+{
+	os << "CooArray<" << RANK << ">(";
+	for (auto ii(A.begin()); ii != A.end(); ++ii) {
+		os << "(";
+		auto idx(ii.index());
+		for (int k=0; k<RANK; ++k) os << idx[k] << " ";
+		os << ": " << ii.val() << ")";
+	}
+	os << ")";
+}
+
 
 #endif	// Guard
