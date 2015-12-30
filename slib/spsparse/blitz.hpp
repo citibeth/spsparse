@@ -1,6 +1,7 @@
 #ifndef SPSPARSE_BLITZ_HPP
 #define SPSPARSE_BLITZ_HPP
 
+#include <vector>
 #include <blitz/array.h>
 
 namespace spsparse {
@@ -40,6 +41,23 @@ std::vector<T> blitz_to_vector(blitz::Array<T,1> const &arr)
 	}
 	return ret;
 }
+// ------------------------------------------------------------------
+template<class T, int RANK>
+blitz::TinyVector<T, RANK> array_to_tiny(std::array<T, RANK> const &arr)
+{
+	blitz::TinyVector<T, RANK> ret;
+	for (int k=0; k<RANK; ++k) ret[k] = arr[k];
+	return ret;
+}
+
+template<class T, int RANK>
+void array_to_tiny(blitz::TinyVector<T, RANK> ret, std::array<T, RANK> const &arr)
+{
+	for (int k=0; k<RANK; ++k) ret[k] = arr[k];
+}
+
+
+// ------------------------------------------------------------------
 
 
 }	// NAMESPACE

@@ -151,6 +151,10 @@ public:
 
 };
 
+template<class Xiter1T, class Xiter2T, class Xiter3T>
+class Join3Xiter<Xiter1T, Xiter2T, Xiter3T> join2_xiter(Xiter1T &&i1, Xiter2T &&i2, Xiter3T &&i3)
+	{ return Join3Xiter<Xiter1T, Xiter2T, Xiter3T>(std::move(i1), std::move(i2), std::move(i3)); }
+
 // ========================================================
 template<class Xiter1T, class Xiter2T>
 class Join2Xiter
@@ -195,6 +199,10 @@ public:
 	}
 
 };
+
+template<class Xiter1T, class Xiter2T>
+class Join2Xiter<Xiter1T, Xiter2T> join2_xiter(Xiter1T &&i1, Xiter2T &&i2)
+	{ return Join2Xiter<Xiter1T, Xiter2T>(std::move(i1), std::move(i2)); }
 
 // ========================================================
 

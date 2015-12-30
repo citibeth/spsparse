@@ -77,6 +77,33 @@ TEST_F(SpSparseTest, permutation) {
 
 }
 
+TEST_F(SpSparseTest, transpose) {
+	// 2-D CooArray; test consolidate
+	CooArray<int, double, 2> arr2({2,4});
+	arr2.add({1,3}, 5.);
+	arr2.add({1,2}, 3.);
+	arr2.add({0,3}, 17.);
+	arr2.add({0,1}, 14.);
+	arr2.add({1,2}, 15.);
+
+	arr2.transpose({0,1});
+	EXPECT_EQ(std::vector<int>({1,1,0,0,1}), blitz_to_vector(arr2.indices(0)));
+	EXPECT_EQ(std::vector<int>({3,2,3,1,2}), blitz_to_vector(arr2.indices(1)));	// j
+	EXPECT_EQ(std::vector<double>({5., 3., 17., 14., 15.}), blitz_to_vector(arr2.vals()));
+
+	arr2.transpose({1,0});
+	EXPECT_EQ(std::vector<int>({3,2,3,1,2}), blitz_to_vector(arr2.indices(0)));	// j
+	EXPECT_EQ(std::vector<int>({1,1,0,0,1}), blitz_to_vector(arr2.indices(1)));
+	EXPECT_EQ(std::vector<double>({5., 3., 17., 14., 15.}), blitz_to_vector(arr2.vals()));
+
+	arr2.transpose({1,0});
+	EXPECT_EQ(std::vector<int>({1,1,0,0,1}), blitz_to_vector(arr2.indices(0)));
+	EXPECT_EQ(std::vector<int>({3,2,3,1,2}), blitz_to_vector(arr2.indices(1)));	// j
+	EXPECT_EQ(std::vector<double>({5., 3., 17., 14., 15.}), blitz_to_vector(arr2.vals()));
+
+}
+
+
 TEST_F(SpSparseTest, consolidate) {
 	// 2-D CooArray; test consolidate
 	CooArray<int, double, 2> arr2({2,4});
@@ -182,6 +209,31 @@ TEST_F(SpSparseTest, dim_beginnings_iterators)
 	EXPECT_EQ(false, ii6.eof());
 	++ii6;
 	EXPECT_EQ(true, ii6.eof());
+
+}
+
+
+TEST_F(SpSparseTest, dense)
+{
+	typedef CooArray<int, double, 2> CooArrayT;
+	CooArrayT arr2({20,10});
+
+	arr2.add({1,0}, 15.);
+	arr2.add({1,3}, 17.);
+	arr2.add({2,4}, 17.);
+	arr2.add({6,4}, 10.);
+
+	blitz::Array<double, 2> dense(arr2.to_dense());
+	int i,j;
+	double sum=0;
+	for (int i=0; i<20; ++i) {
+	for (int j=0; j<10; ++j) {
+		sum += dense(i,j);
+	}}
+	EXPECT_EQ(sum, 59.);
+
+	for (auto ii(arr2.begin()); ii != arr2.end(); ++ii)
+		EXPECT_EQ(dense(ii.index(0), ii.index(1)), ii.val());
 
 }
 
