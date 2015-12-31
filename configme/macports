@@ -7,3 +7,4 @@ cmake \
 	-DBLITZ++_PKGCONF_LIBRARY_DIRS=$MACPORTS/lib \
 	"$@"
 
+#	-DCMAKE_CXX_FLAGS=-O3 \
