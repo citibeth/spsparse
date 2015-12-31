@@ -3,6 +3,14 @@
 
 #include <spsparse/array.hpp>
 
+namespace spsparse {
+
+/** @defgroup netcdf netcdf.hpp
+@brief Simple way to read/write SpSparse arrays via NetCDF.
+
+@{
+*/
+
 // These need to move outside of the CooArray class.
 // Temporarily comment out NetCDF stuff.
 // Not sure if it belongs in the core class.
@@ -44,6 +52,7 @@ void netcdf_write(NcFile &nc, std::string const &vname) const
 	}
 }
 
+/** @} */
 
 }	// Namespace
 #endif	// Guard

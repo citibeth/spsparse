@@ -13,6 +13,12 @@ if (USE_EVERYTRACE)
 	include_directories(${EVERYTRACE_INCLUDE_DIR})
 endif()
 
+# -----------------------------------------------------
+#https://cmake.org/pipermail/cmake/2007-February/012796.html
+FIND_PACKAGE(Doxygen)
+
+# ----------------------------------------------------------
+
 include (setup_rpath)
 
 # --------------------- Define our toolchain
@@ -24,3 +30,4 @@ find_package(Blitz++ REQUIRED)
 add_subdirectory(slib)
 #add_subdirectory(bin)
 add_subdirectory(test)
+

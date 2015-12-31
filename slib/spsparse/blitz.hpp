@@ -6,6 +6,12 @@
 
 namespace spsparse {
 
+/** @defgroup blitz blitz.hpp
+@brief Utilities for working with Blitz++ library.
+
+@{
+*/
+
 // ------------------------------------------------------------------
 #define VECTOR_TO_BLITZ_BODY \
     blitz::TinyVector<int,1> shape(0); \
@@ -59,7 +65,7 @@ void array_to_tiny(blitz::TinyVector<TinyT, RANK> &ret, std::array<ArrayT, RANK>
 
 // ------------------------------------------------------------------
 
-
+/** @} */
 }	// NAMESPACE
 
 #endif

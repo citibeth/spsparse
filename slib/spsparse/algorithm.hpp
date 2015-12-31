@@ -7,9 +7,33 @@
 
 namespace spsparse {
 
+/** @defgroup algorithm algorithm.hpp
+@brief Algorithms on SpSparse arrays
+
+Most operations on SpSpare arrays are written in a type-independent fashion, as algorithms.  Algorithms are all written with input and output parameters, the output being an accumulator.
+
+The first parameter for an algorithm is always the output (an accumulator).  Interestingly, that is always the LAST argument of its template.
+
+@{
+*/
+
 // ====================================================
-/** Wrapps CooArray::iterator, currying one dimension
-so that operator*() produces the index in that dimension. */
+/** @brief Select out just one dimension of the index on iteration.
+
+Wraps CooArray::iterator, changing operator*() to produce produces the
+index in just one dimension.
+
+Code Example
+@code
+CooMatrix<int, double> const A;
+typedef DimIndexIter<decltype(A)::const_iterator> DIType;
+for (DIType ii(1, A.begin()); ii != DIType(1, A.end()); ++ii)
+	printf("Element with column %d and value %d\n", *ii, ii.val());
+@endcode
+
+@see spsparse::CooMatrix::dim_iter(), spsparse::CooMatrix::dim_begin(), spsparse::CooMatrix::dim_end()
+*/
+
 template<class IterT>
 class DimIndexIter : public WrapForwardValIter<IterT>
 {
@@ -29,6 +53,9 @@ public:
 
 
 // -----------------------------------------------------------
+/** @brief Copy a sparse array
+@param ret Accumulator for output.
+@param A Input. */
 template<class CooArrayT, class AccumulatorT>
 void copy(AccumulatorT &ret, CooArrayT const &A)
 {
@@ -38,6 +65,10 @@ void copy(AccumulatorT &ret, CooArrayT const &A)
 	}
 }
 // -----------------------------------------------------------
+/** @brief Transpose a sparse array (reorder its dimensions)
+@param ret Accumulator for output.
+@param A Input.
+@param perm Permutation on dimensions.  ret.dim[i] == A.dim[perm[i]] */
 template<class CooArrayT, class AccumulatorT>
 void transpose(AccumulatorT &ret, CooArrayT const &A, std::array<int,CooArrayT::rank> const &perm)
 {
@@ -51,7 +82,17 @@ void transpose(AccumulatorT &ret, CooArrayT const &A, std::array<int,CooArrayT::
 	}
 }
 // -----------------------------------------------------------
-/** A must be sorted properly.
+/** @brief Determines offset of beginning of each row/col (leading sorted dimension) in an array.
+@note The array MUST be sorted properly beforehand, or this will fail.
+
+Code Example
+@code
+CooMatrix<int, double> A;
+A.consolidate({0,1});
+std::vector<size_t> row_start = dim_beginnings(A);
+A.consolidate({1,0});
+std::vector<size_t> col_start = dim_beginnings(A);
+
 See: CooArray::consolidate() */
 template<class CooArrayT>
 std::vector<size_t> dim_beginnings(CooArrayT const &A)
@@ -99,8 +140,59 @@ printf("]\n");
 	return abegin;
 }
 // ----------------------------------------------------------
-/** Iterates over one row/col at a time (in general, one index in a dimension).
-The underlying array must be sorted by that dimension. */
+/** @brief Iterates through a sorted sparse array on a per-row (or column) basis.
+
+Example Code:
+@code
+CooMatrix<int, double> const A;
+CooMatrix<int, double> Arm;
+consolidate(Arm, A, {0,1});	// Arm = A row major
+auto row_beginnings(dim_beginnings(Arm));
+for (DimBeginningsXiter<decltype(A)> ii(&A, 0, 1,
+	row_beginnings.begin(), row_beginnings.end());
+	!ii.eof(); ++ii)
+{
+	printf("Row %d contains:", *ii);
+	for (auto jj=join_a->sub_xiter(); !jj.eof(); ++jj) {
+		printf(" (col=%d : val=%g)", *jj, jj.val());
+		}
+	printf("\n");
+}
+@endcode
+
+
+Convenience methods allow a simplification as follows:
+@code
+CooMatrix<int, double> A;
+
+A.consolidate({0,1});
+for (auto ii(A.dim_beginnings_xiter(); !ii.eof(); ++ii) {
+{
+	printf("Row %d contains:", *ii);
+	for (auto jj=join_a->sub_xiter(); !jj.eof(); ++jj) {
+		printf(" (col=%d : val=%g)", *jj, jj.val());
+	}
+	printf("\n");
+}
+@endcode
+
+We can also use this to scan through the matrix in row-major order:
+@code
+CooMatrix<int, double> A;
+
+A.consolidate({1,0});
+for (auto ii(A.dim_beginnings_xiter(); !ii.eof(); ++ii) {
+{
+	printf("Col %d contains:", *ii);
+	for (auto jj=join_a->sub_xiter(); !jj.eof(); ++jj) {
+		printf(" (row=%d : val=%g)", *jj, jj.val());
+	}
+	printf("\n");
+}
+@endcode
+
+@see spsparse::CooArray::dim_beginnings_xiter()
+*/
 template<class CooArrayT>
 class DimBeginningsXiter : public STLXiter<std::vector<size_t>::const_iterator>
 {
@@ -114,6 +206,11 @@ protected:
 	int val_dim;	// Dimension corresponding to our "cols"
 
 public:
+	/** @param _arr Matrix to iterate over (must live at least as long as this).
+	@param _index_dim Dimension for the outer loop (eg: 0 for row major iteration).
+	@param _val_dim Dimension for the inner loop (eg: 1 for row major iteration).
+	@param dim_beginnings_begin Iterator in dim_beginnings array indicating the start of the outer loop (see spsparse::dim_beginnings()).
+	@param dim_beginnings_end Iterator in dim_beginnings array indicating the end of the outer loop (see spsparse::dim_beginnings()). */
 	DimBeginningsXiter(
 		CooArrayT const *_arr,
 		int _index_dim, int _val_dim,
@@ -123,13 +220,17 @@ public:
 		arr(_arr), index_dim(_index_dim), val_dim(_val_dim)
 	{}
 
-	// Remember the sentinel at the end!
-	bool eof() { return ((ii+1) == end); }
+	bool eof() { return ((ii+1) == end); }	// ii+1: Remember the sentinel at the end!
 
 	index_type operator*()
 		{ return arr->index(index_dim, *ii); }
 
-	/** Returns an Xiter along the current row/col in the CooArray. */
+	/** @brief Iterate along the current column (if we're scanning row
+	major), or row (if we're scanning column major) of the matrix.
+
+	@param _val_dim Dimension to report via operator*()  (1 for row major, 0 for column major).
+	@see spsparse::DimIndexIter, spsparse::CooArray::dim_begin()
+	*/
 	typedef ValSTLXiter<typename CooArrayT::const_dim_iterator> sub_xiter_type;
 	sub_xiter_type sub_xiter(int _val_dim = -1)
 	{
@@ -142,6 +243,13 @@ public:
 	// No val()
 };
 // -----------------------------------------------------
+/** @brief Sorts an array and removes duplicates.
+@param ret Accumulator for output.
+@param A Input.
+@param sort_order Order of dimensions to sort.  Use {0,1} for row major.
+@param duplicate_policy What to do when duplicate entries are encountered (ADD (default), LEAVE_ALONE, REPLACE).
+@param zero_nan If true, treat NaNs as zeros in the matrix (i.e. remove them).  This will prevent NaNs from propagating in computations.
+*/
 template<class CooArrayT, class AccumulatorT>
 void consolidate(AccumulatorT &ret,
 	CooArrayT const &A,
@@ -212,8 +320,9 @@ finished:
 	ret.set_sorted(sort_order);
 }
 // -----------------------------------------------------
-/* Consolidates an array, if it is not already consolidated.
-Does not overwrite the original. */
+/** @brief Consolidates an array, if it is not already consolidated.
+Does not overwrite the original.
+@see spsparse::consolidate() */
 template<class ArrayT>
 class Consolidate
 {
@@ -221,6 +330,12 @@ class Consolidate
 	std::unique_ptr<ArrayT> A2;		// If needed.
 	ArrayT const *Ap;						// The final answer
 public:
+	/** 
+	@param A Matrix to consolidate. (must live at least as long as this).
+	@param sort_order Order of dimensions to sort.  Use {0,1} for row major.
+	@param duplicate_policy What to do when duplicate entries are encountered (ADD (default), LEAVE_ALONE, REPLACE).
+	@param zero_nan If true, treat NaNs as zeros in the matrix (i.e. remove them).  This will prevent NaNs from propagating in computations.
+	@see spsparse::consolidate() */
 	Consolidate(ArrayT const *A,
 		std::array<int, ArrayT::rank> const &sort_order,
 		DuplicatePolicy duplicate_policy = DuplicatePolicy::ADD,
@@ -237,12 +352,18 @@ public:
 		}
 	}
 
+	/** @brief Produces the consolidated array.
+
+	This might be the original array called in the constructor, if
+	that was properly consolidated; or it might be a new array created
+	in this class. */
 	ArrayT const &operator()() {
 		return *Ap;
 	}
 };
 // -------------------------------------------------------------
 // --------------------------------------------------------
+/** @brief Internal class used by spsparse::sorted_permutation(). */
 template<class CooArrayT>
 struct CmpIndex {
 	const int RANK = CooArrayT::rank;
@@ -266,6 +387,15 @@ struct CmpIndex {
 	}
 };
 
+/** @brief Generates a permutation that, if applied, would result in the array being sorted.
+
+@param A Input array.
+@param sort_order Order of dimensions to sort.  Use {0,1} for row major.
+@return The permutation.
+
+@note Sorting is done in-place.  Elements added first will remain
+      first, allowing for proper behavior of duplicate_policy in
+      spsparse::consolidate(). */
 template<class CooArrayT>
 std::vector<size_t> sorted_permutation(CooArrayT const &A,
 	std::array<int, CooArrayT::rank> const &sort_order)
@@ -287,6 +417,7 @@ std::vector<size_t> sorted_permutation(CooArrayT const &A,
 
 // ----------------------------------------------------------
 
-}
+/** @} */
+}	// Namespace
 
 #endif // Guard

@@ -6,8 +6,38 @@
 
 namespace spsparse {
 
+/** @defgroup multiply_sparse multiply_sparse.hpp
+@brief Fully sparse-sparse multiplication algorithms.
+
+Code Example
+@code
+// --------- Matrix-Matrix Multiplation
+CooMatrix<int, double> A,B,AB,BtAt;
+multiply(AB, 1.0, NULL, A,'.', NULL, B,'.', NULL);
+multiply(BtAt, 1.0, NULL, B,'T', NULL, A,'T', NULL);
+// Now: AB == BtAt (but we don't yet have a way to compare arrays)
+
+CooMatrix<int, double> ret;
+CooVector<int, double> scalei(A.shape[0]);
+CooVector<int, double> scalej(A.shape[1]);
+multiply(AB, 17.0, &scale, A,'.', &scalej, B,'.', NULL);
+
+// --------- Matrix-Vector Multiplation
+CooVector<int, double> V(B.shape[1]);
+CooVector<int, double> retV;
+multiply(retV, 1.0, NULL, AB,'.', NULL, V);
+@endcode
+
+
+@{
+*/
+
 // -------------------------------------------------------------
-/** Superclass to chose whether we do/do not multiply our matrix by a scaling diag. matrix */
+
+/** @brief Internal helper class for sparse-sparse multiplication.
+
+Superclass used to chose whether we do/do not multiply our
+matrix by a diagonal scaling matrix */
 template<class MatT>
 struct MultXiter {
 	virtual typename MatT::index_type index() = 0;
@@ -18,6 +48,9 @@ struct MultXiter {
 };
 
 
+/** @brief Internal helper class for sparse-sparse multiplication.
+
+Use this if you do NOT want to use a diagonal scaling matrix. */
 template<class MatT>
 class SimpleMultXiter : public MultXiter<MatT>
 {
@@ -37,8 +70,9 @@ public:
 
 
 
-/** Used to iterate along row/columns for multiply, along with a
-diagonal scale matrix. */
+/** @brief Internal helper class for sparse-sparse multiplication.
+
+Use this if you DO want to use a diagonal scaling matrix. */
 template<class MatT, class ScaleT>
 class ScaledMultXiter : public MultXiter<MatT>
 {
@@ -60,6 +94,11 @@ public:
 	typename DimBeginningsXiter<MatT>::sub_xiter_type sub_xiter() { return ii.i1.sub_xiter(); }
 };
 
+/** @brief Internal helper function for sparse-sparse multiplication.
+
+Chooses the correct spsparse::MultXiter, based on whether or not there
+is a diagonal scaling matrix.
+*/
 template<class MatT, class ScaleT>
 std::unique_ptr<MultXiter<MatT>> new_mult_xiter(MatT const &A, ScaleT const *scale)
 {
@@ -71,11 +110,31 @@ std::unique_ptr<MultXiter<MatT>> new_mult_xiter(MatT const &A, ScaleT const *sca
 			new SimpleMultXiter<MatT>(A));
 	}
 
-};
+}
 // -------------------------------------------------------------
-/** Matrix-matrix multiply */
+/** @brief Matrix-matrix multiply.
+
+Computes:
+@code
+ret = C * diag(scalei) * A * diag(scalej) * B * diag(scalek)
+@endcode
+
+@param ret Accumulator for output.
+@param C Constant to multiply by.
+@param scalei Vector for diagonal scale matrix (NULL if not used).
+@param A Matrix
+@param transpose_A If =='T', then use transpose(A) instead of A
+@param scalej Vector for diagonal scale matrix (NULL if not used).
+@param B Matrix
+@param transpose_B If =='T', then use transpose(B) instead of A
+@param scalek Vector for diagonal scale matrix (NULL if not used).
+@param duplicate_policy Use if A or B needs to be consolidated.
+@param zero_nan Use if A or B needs to be consolidated.
+
+@see spsparse::consolidate()
+*/
 template<class ScaleIT, class MatAT, class ScaleJT, class MatBT, class ScaleKT, class AccumulatorT>
-static void multiply(
+void multiply(
 	AccumulatorT &ret,
 	double C,		// Multiply everything by this
 	ScaleIT const *scalei,
@@ -172,9 +231,27 @@ printf("set: (%d %d : %g)\n", aix, bix, sum * C * a_scale * b_scale);
 
 }
 // ------------------------------------------------------------
-/** Matrix-vector multiply */
+/** @brief Matrix-vector multiply.
+
+Computes:
+@code
+ret = C * diag(scalei) * A * diag(scalej) * V
+@endcode
+
+@param ret Accumulator for output.
+@param C Constant to multiply by.
+@param scalei Vector for diagonal scale matrix (NULL if not used).
+@param A Matrix
+@param transpose_A If =='T', then use transpose(A) instead of A
+@param scalej Vector for diagonal scale matrix (NULL if not used).
+@param V Vector
+@param duplicate_policy Use if A or B needs to be consolidated.
+@param zero_nan Use if A or B needs to be consolidated.
+
+@see spsparse::consolidate()
+*/
 template<class ScaleIT, class MatAT, class ScaleJT, class VecT, class AccumulatorT>
-static void multiply(
+void multiply(
 	AccumulatorT &ret,
 	double C,		// Multiply everything by this
 	ScaleIT const *scalei,
@@ -261,7 +338,7 @@ printf("    set: (%d : %g)\n", aix, sum * C * a_scale);
 
 
 
-
+/** @} */
 
 } // namespace
 

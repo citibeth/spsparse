@@ -19,6 +19,12 @@
 
 namespace spsparse {
 
+/** @defgroup array array.hpp
+@brief Basic sparse arrays
+
+@{
+*/
+
 
 // -----------------------------------------------------
 template<class IndexT, class ValT, int RANK>
@@ -362,6 +368,8 @@ template<class IndexT, class ValT>
 using CooVector = CooArray<IndexT, ValT, 1>;
 
 
+
+/** @} */
 
 }	// Namespace
 

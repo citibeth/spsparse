@@ -1,3 +1,10 @@
+
+/** @defgroup multiply_dense multiply_dense.hpp
+@brief Multiplication of sparse matrices by dense vectors.
+
+@{
+*/
+
 #if 0
 
 /** (Sparse Matrix) * (Dense Vector) */
@@ -29,3 +36,5 @@ void multiplyT(
 #endif
 
 // ---------------------------------------------------
+
+/** @} */
