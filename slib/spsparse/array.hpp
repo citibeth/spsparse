@@ -55,15 +55,9 @@ public:
 	bool edit_mode;		// Are we in edit mode?
 	std::array<int,RANK> sort_order;	// Non-negative elements if this is sorted
 
-	CooArray() : edit_mode(true), dim_beginnings_set(false), sort_order() {
-		sort_order[0] = -1;
-		for (int k=0; k<RANK; ++k) shape[k] = 0;	// User must set this later
-	}
+	CooArray();
 
-	CooArray(std::array<size_t, RANK> const &_shape)
-	: shape(_shape), edit_mode(true), dim_beginnings_set(false), sort_order() {
-		sort_order[0] = -1;
-	}
+	CooArray(std::array<size_t, RANK> const &_shape);
 
 	std::unique_ptr<ThisCooArrayT> new_blank() const
 		{ return std::unique_ptr<ThisCooArrayT>(new ThisCooArrayT(shape)); }
@@ -101,63 +95,19 @@ public:
 		{ return vector_to_blitz(val_vec); }
 
 	// Move semantics
-	CooArray(CooArray &&other) :
-		shape(other.shape),
-		index_vecs(std::move(other.index_vecs)),
-		val_vec(std::move(other.val_vec)),
-		dim_beginnings_set(other.dim_beginnings_set),
-		_dim_beginnings(std::move(other._dim_beginnings)),
-		edit_mode(other.edit_mode),
-		sort_order(other.sort_order) {}
-
-	void operator=(ThisCooArrayT &&other) {
-		shape = other.shape;
-		index_vecs = std::move(other.index_vecs);
-		val_vec = std::move(other.val_vec);
-		dim_beginnings_set = other.dim_beginnings_set;
-		_dim_beginnings = std::move(other._dim_beginnings);
-		edit_mode = other.edit_mode;
-		sort_order = other.sort_order;
-	}
+	CooArray(CooArray &&other);
+	void operator=(ThisCooArrayT &&other);
 
 	// Copy semantics
-	CooArray(CooArray const &other) :
-		shape(other.shape),
-		index_vecs(other.index_vecs),
-		val_vec(other.val_vec),
-		dim_beginnings_set(other.dim_beginnings_set),
-		_dim_beginnings(other._dim_beginnings),
-		edit_mode(other.edit_mode),
-		sort_order(other.sort_order) {}
-
-	void operator=(ThisCooArrayT const &other) {
-		shape = other.shape;
-		index_vecs = other.index_vecs;
-		val_vec = other.val_vec;
-		dim_beginnings_set = other.dim_beginnings_set;
-		_dim_beginnings = other._dim_beginnings;
-		edit_mode = other.edit_mode;
-		sort_order = other.sort_order;
-	}
+	CooArray(CooArray const &other);
+	void operator=(ThisCooArrayT const &other);
 
 
 	// -------------------------------------------------
 	size_t size() const
 		{ return val_vec.size(); }
-
-	void clear() {
-		for (int k=0; k<RANK; ++k) index_vecs[k].clear();
-		val_vec.clear();
-		dim_beginnings_set = false;
-		_dim_beginnings.clear();
-		edit_mode = true;
-		sort_order[0] = -1;
-	}
-
-	void reserve(size_t size) {
-		for (int k=0; k<RANK; ++k) index_vecs[k].reserve(size);
-		val_vec.reserve(size);
-	}
+	void clear();
+	void reserve(size_t size);
 
 	// -------------------------------------------------
 	// --------------------------------------------------
@@ -267,7 +217,115 @@ public:
 		sort_order[0] = -1;
 	}
 
-	void add(std::array<IndexT, RANK> const index, ValT const val)
+	void add(std::array<IndexT, RANK> const index, ValT const val);
+
+	/** Mark that this is now in sorted form. */
+	void set_sorted(std::array<int,RANK> _sort_order)
+	{
+		sort_order = _sort_order;
+		edit_mode = false;
+	}
+
+	// --------------------------------------------------
+	// In-place algos
+	void consolidate(
+		std::array<int, RANK> const &_sort_order,
+		DuplicatePolicy duplicate_policy = DuplicatePolicy::ADD,
+		bool handle_nan = false);
+
+	void transpose(std::array<int, RANK> const &sort_order)
+	{
+		OverwriteAccum<iterator> overwrite(begin());
+		spsparse::transpose(overwrite, *this, sort_order);
+	}
+
+	blitz::Array<ValT, RANK> to_dense();
+
+	// Sets and returns this->_dim_beginnings
+	std::vector<size_t> const &dim_beginnings() const;
+
+	DimBeginningsXiter<ThisCooArrayT> dim_beginnings_xiter() const;
+};
+
+
+
+// --------------------------- Method Definitions
+template<class IndexT, class ValT, int RANK>
+CooArray<IndexT, ValT, RANK>::
+	CooArray() : edit_mode(true), dim_beginnings_set(false), sort_order() {
+		sort_order[0] = -1;
+		for (int k=0; k<RANK; ++k) shape[k] = 0;	// User must set this later
+	}
+
+template<class IndexT, class ValT, int RANK>
+CooArray<IndexT, ValT, RANK>::
+	CooArray(std::array<size_t, RANK> const &_shape)
+	: shape(_shape), edit_mode(true), dim_beginnings_set(false), sort_order() {
+		sort_order[0] = -1;
+	}
+
+template<class IndexT, class ValT, int RANK>
+CooArray<IndexT, ValT, RANK>::
+	CooArray(CooArray &&other) :
+		shape(other.shape),
+		index_vecs(std::move(other.index_vecs)),
+		val_vec(std::move(other.val_vec)),
+		dim_beginnings_set(other.dim_beginnings_set),
+		_dim_beginnings(std::move(other._dim_beginnings)),
+		edit_mode(other.edit_mode),
+		sort_order(other.sort_order) {}
+
+template<class IndexT, class ValT, int RANK>
+	void CooArray<IndexT, ValT, RANK>::operator=(ThisCooArrayT &&other) {
+		shape = other.shape;
+		index_vecs = std::move(other.index_vecs);
+		val_vec = std::move(other.val_vec);
+		dim_beginnings_set = other.dim_beginnings_set;
+		_dim_beginnings = std::move(other._dim_beginnings);
+		edit_mode = other.edit_mode;
+		sort_order = other.sort_order;
+	}
+
+template<class IndexT, class ValT, int RANK>
+CooArray<IndexT, ValT, RANK>::
+	CooArray(CooArray const &other) :
+		shape(other.shape),
+		index_vecs(other.index_vecs),
+		val_vec(other.val_vec),
+		dim_beginnings_set(other.dim_beginnings_set),
+		_dim_beginnings(other._dim_beginnings),
+		edit_mode(other.edit_mode),
+		sort_order(other.sort_order) {}
+
+template<class IndexT, class ValT, int RANK>
+	void CooArray<IndexT, ValT, RANK>::operator=(ThisCooArrayT const &other) {
+		shape = other.shape;
+		index_vecs = other.index_vecs;
+		val_vec = other.val_vec;
+		dim_beginnings_set = other.dim_beginnings_set;
+		_dim_beginnings = other._dim_beginnings;
+		edit_mode = other.edit_mode;
+		sort_order = other.sort_order;
+	}
+
+template<class IndexT, class ValT, int RANK>
+void CooArray<IndexT, ValT, RANK>::clear() {
+		for (int k=0; k<RANK; ++k) index_vecs[k].clear();
+		val_vec.clear();
+		dim_beginnings_set = false;
+		_dim_beginnings.clear();
+		edit_mode = true;
+		sort_order[0] = -1;
+	}
+
+template<class IndexT, class ValT, int RANK>
+void CooArray<IndexT, ValT, RANK>::reserve(size_t size) {
+		for (int k=0; k<RANK; ++k) index_vecs[k].reserve(size);
+		val_vec.reserve(size);
+	}
+
+template<class IndexT, class ValT, int RANK>
+	void CooArray<IndexT, ValT, RANK>::add(std::array<IndexT, RANK> const index, ValT const val)
 	{
 		if (!edit_mode) {
 			(*sparse_error)(-1, "Must be in edit mode to use CooArray::add()");
@@ -296,19 +354,11 @@ public:
 		val_vec.push_back(val);
 	}
 
-	/** Mark that this is now in sorted form. */
-	void set_sorted(std::array<int,RANK> _sort_order)
-	{
-		sort_order = _sort_order;
-		edit_mode = false;
-	}
-
-	// --------------------------------------------------
-	// In-place algos
-	void consolidate(
+template<class IndexT, class ValT, int RANK>
+void CooArray<IndexT, ValT, RANK>::consolidate(
 		std::array<int, RANK> const &_sort_order,
-		DuplicatePolicy duplicate_policy = DuplicatePolicy::ADD,
-		bool handle_nan = false)
+		DuplicatePolicy duplicate_policy,
+		bool handle_nan)
 	{
 		// Do nothing if we're already properly consolidated
 		if (this->sort_order == _sort_order && !edit_mode) return;
@@ -318,13 +368,8 @@ public:
 		*this = std::move(ret);
 	}
 
-	void transpose(std::array<int, RANK> const &sort_order)
-	{
-		OverwriteAccum<iterator> overwrite(begin());
-		spsparse::transpose(overwrite, *this, sort_order);
-	}
-
-	blitz::Array<ValT, RANK> to_dense()
+template<class IndexT, class ValT, int RANK>
+	blitz::Array<ValT, RANK> CooArray<IndexT, ValT, RANK>::to_dense()
 	{
 		blitz::Array<ValT, RANK> ret(array_to_tiny<int,size_t,rank>(shape));
 		ret = 0;
@@ -333,8 +378,9 @@ public:
 		return ret;
 	}
 
+template<class IndexT, class ValT, int RANK>
 	// Sets and returns this->_dim_beginnings
-	std::vector<size_t> const &dim_beginnings() const
+	std::vector<size_t> const &CooArray<IndexT, ValT, RANK>::dim_beginnings() const
 	{
 		// See if we need to compute it; lazy eval
 		if (!dim_beginnings_set) {
@@ -346,7 +392,8 @@ public:
 		return _dim_beginnings;
 	}
 
-	DimBeginningsXiter<ThisCooArrayT> dim_beginnings_xiter() const
+template<class IndexT, class ValT, int RANK>
+	DimBeginningsXiter <CooArray<IndexT, ValT, RANK>> CooArray<IndexT, ValT, RANK>::dim_beginnings_xiter() const
 	{
 		auto &db(dim_beginnings());
 		int const index_dim = sort_order[0];
@@ -354,13 +401,8 @@ public:
 		return DimBeginningsXiter<ThisCooArrayT>(this, index_dim, val_dim, db.begin(), db.end());
 	}
 
-};
 
-
-
-
-
-
+// ---------------------------------------------------------------------------
 template<class IndexT, class ValT>
 using CooMatrix = CooArray<IndexT, ValT, 2>;
 
@@ -374,7 +416,7 @@ using CooVector = CooArray<IndexT, ValT, 1>;
 }	// Namespace
 
 
-
+// ---------------------------------------------------------------------------
 template<class IndexT, class ValT, int RANK>
 std::ostream &operator<<(std::ostream &os, spsparse::CooArray<IndexT, ValT, RANK> const &A);
 
@@ -393,6 +435,7 @@ std::ostream &operator<<(std::ostream &os, spsparse::CooArray<IndexT, ValT, RANK
 	os << ")";
 	return os;
 }
+// ---------------------------------------------------------------------------
 
 
 #endif	// Guard

@@ -67,9 +67,7 @@ public:
 	typename MatT::val_type scale_val() { return 1; }
 	typename DimBeginningsXiter<MatT>::sub_xiter_type sub_xiter() { return ii.sub_xiter(); }
 };
-
-
-
+// ---------------------------------------------------------
 /** @brief Internal helper class for sparse-sparse multiplication.
 
 Use this if you DO want to use a diagonal scaling matrix. */
@@ -94,11 +92,15 @@ public:
 	typename DimBeginningsXiter<MatT>::sub_xiter_type sub_xiter() { return ii.i1.sub_xiter(); }
 };
 
+// ---------------------------------------------------------
 /** @brief Internal helper function for sparse-sparse multiplication.
 
 Chooses the correct spsparse::MultXiter, based on whether or not there
 is a diagonal scaling matrix.
 */
+template<class MatT, class ScaleT>
+std::unique_ptr<MultXiter<MatT>> new_mult_xiter(MatT const &A, ScaleT const *scale);
+
 template<class MatT, class ScaleT>
 std::unique_ptr<MultXiter<MatT>> new_mult_xiter(MatT const &A, ScaleT const *scale)
 {
@@ -133,6 +135,20 @@ ret = C * diag(scalei) * A * diag(scalej) * B * diag(scalek)
 
 @see spsparse::consolidate()
 */
+template<class ScaleIT, class MatAT, class ScaleJT, class MatBT, class ScaleKT, class AccumulatorT>
+void multiply(
+	AccumulatorT &ret,
+	double C,		// Multiply everything by this
+	ScaleIT const *scalei,
+	MatAT const &A,
+	char transpose_A,			// 'T' for transpose, '.' otherwise
+	ScaleJT const *scalej,		// Vector
+	MatBT const &B,
+	char transpose_B,			// 'T' for transpose, '.' otherwise
+	ScaleKT const *scalek,
+	DuplicatePolicy duplicate_policy = DuplicatePolicy::ADD,
+	bool zero_nan = false);
+
 template<class ScaleIT, class MatAT, class ScaleJT, class MatBT, class ScaleKT, class AccumulatorT>
 void multiply(
 	AccumulatorT &ret,
@@ -250,6 +266,18 @@ ret = C * diag(scalei) * A * diag(scalej) * V
 
 @see spsparse::consolidate()
 */
+template<class ScaleIT, class MatAT, class ScaleJT, class VecT, class AccumulatorT>
+void multiply(
+	AccumulatorT &ret,
+	double C,		// Multiply everything by this
+	ScaleIT const *scalei,
+	MatAT const &A,
+	char transpose_A,			// 'T' for transpose, '.' otherwise
+	ScaleJT const *scalej,		// Vector
+	VecT const &V,
+	DuplicatePolicy duplicate_policy = DuplicatePolicy::ADD,
+	bool zero_nan = false);
+
 template<class ScaleIT, class MatAT, class ScaleJT, class VecT, class AccumulatorT>
 void multiply(
 	AccumulatorT &ret,

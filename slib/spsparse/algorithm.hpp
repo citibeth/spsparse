@@ -33,7 +33,6 @@ for (DIType ii(1, A.begin()); ii != DIType(1, A.end()); ++ii)
 
 @see spsparse::CooMatrix::dim_iter(), spsparse::CooMatrix::dim_begin(), spsparse::CooMatrix::dim_end()
 */
-
 template<class IterT>
 class DimIndexIter : public WrapForwardValIter<IterT>
 {
@@ -44,18 +43,29 @@ public:
 	typedef WrapForwardValIter<IterT> WrapT;
 	// Export as is standard with STL
 
-	DimIndexIter(int _dim, IterT const &_ii) : WrapT(_ii), dim(_dim) {}
-	DimIndexIter(int _dim, IterT const &&_ii) : WrapT(std::move(_ii)), dim(_dim) {}
+	DimIndexIter(int _dim, IterT const &_ii);
+	DimIndexIter(int _dim, IterT const &&_ii);
 
 	value_type operator*()
 		{ return this->ii.index(dim); }
 };
 
+// ------------- Method Definitions
+template<class IterT>
+DimIndexIter<IterT>::
+	DimIndexIter(int _dim, IterT const &_ii) : WrapT(_ii), dim(_dim) {}
+
+template<class IterT>
+DimIndexIter<IterT>::
+	DimIndexIter(int _dim, IterT const &&_ii) : WrapT(std::move(_ii)), dim(_dim) {}
 
 // -----------------------------------------------------------
 /** @brief Copy a sparse array
 @param ret Accumulator for output.
 @param A Input. */
+template<class CooArrayT, class AccumulatorT>
+void copy(AccumulatorT &ret, CooArrayT const &A);
+
 template<class CooArrayT, class AccumulatorT>
 void copy(AccumulatorT &ret, CooArrayT const &A)
 {
@@ -69,6 +79,9 @@ void copy(AccumulatorT &ret, CooArrayT const &A)
 @param ret Accumulator for output.
 @param A Input.
 @param perm Permutation on dimensions.  ret.dim[i] == A.dim[perm[i]] */
+template<class CooArrayT, class AccumulatorT>
+void transpose(AccumulatorT &ret, CooArrayT const &A, std::array<int,CooArrayT::rank> const &perm);
+
 template<class CooArrayT, class AccumulatorT>
 void transpose(AccumulatorT &ret, CooArrayT const &A, std::array<int,CooArrayT::rank> const &perm)
 {
@@ -94,6 +107,9 @@ A.consolidate({1,0});
 std::vector<size_t> col_start = dim_beginnings(A);
 
 See: CooArray::consolidate() */
+template<class CooArrayT>
+std::vector<size_t> dim_beginnings(CooArrayT const &A);
+
 template<class CooArrayT>
 std::vector<size_t> dim_beginnings(CooArrayT const &A)
 {
@@ -215,10 +231,7 @@ public:
 		CooArrayT const *_arr,
 		int _index_dim, int _val_dim,
 		DimIterT const &dim_beginnings_begin,
-		DimIterT const &dim_beginnings_end)
-	: STLXiter<std::vector<size_t>::const_iterator>(dim_beginnings_begin, dim_beginnings_end),
-		arr(_arr), index_dim(_index_dim), val_dim(_val_dim)
-	{}
+		DimIterT const &dim_beginnings_end);
 
 	bool eof() { return ((ii+1) == end); }	// ii+1: Remember the sentinel at the end!
 
@@ -232,7 +245,25 @@ public:
 	@see spsparse::DimIndexIter, spsparse::CooArray::dim_begin()
 	*/
 	typedef ValSTLXiter<typename CooArrayT::const_dim_iterator> sub_xiter_type;
-	sub_xiter_type sub_xiter(int _val_dim = -1)
+	sub_xiter_type sub_xiter(int _val_dim = -1);
+
+	// No val()
+};
+
+// -------------- Method Definitions
+template<class CooArrayT>
+DimBeginningsXiter<CooArrayT>::
+	DimBeginningsXiter(
+		CooArrayT const *_arr,
+		int _index_dim, int _val_dim,
+		DimIterT const &dim_beginnings_begin,
+		DimIterT const &dim_beginnings_end)
+	: STLXiter<std::vector<size_t>::const_iterator>(dim_beginnings_begin, dim_beginnings_end),
+		arr(_arr), index_dim(_index_dim), val_dim(_val_dim)
+	{}
+
+template<class CooArrayT>
+	typename DimBeginningsXiter<CooArrayT>::sub_xiter_type DimBeginningsXiter<CooArrayT>::sub_xiter(int _val_dim)
 	{
 		if (_val_dim < 0) _val_dim = val_dim;
 		size_t a0 = *ii;
@@ -240,8 +271,7 @@ public:
 		return sub_xiter_type(arr->dim_iter(_val_dim, a0), arr->dim_iter(_val_dim, a1));
 	}
 
-	// No val()
-};
+
 // -----------------------------------------------------
 /** @brief Sorts an array and removes duplicates.
 @param ret Accumulator for output.
@@ -250,6 +280,13 @@ public:
 @param duplicate_policy What to do when duplicate entries are encountered (ADD (default), LEAVE_ALONE, REPLACE).
 @param zero_nan If true, treat NaNs as zeros in the matrix (i.e. remove them).  This will prevent NaNs from propagating in computations.
 */
+template<class CooArrayT, class AccumulatorT>
+void consolidate(AccumulatorT &ret,
+	CooArrayT const &A,
+	std::array<int, CooArrayT::rank> const &sort_order,
+	DuplicatePolicy duplicate_policy = DuplicatePolicy::ADD,
+	bool zero_nan = false);	// Treat NaN like 0
+
 template<class CooArrayT, class AccumulatorT>
 void consolidate(AccumulatorT &ret,
 	CooArrayT const &A,
@@ -339,7 +376,25 @@ public:
 	Consolidate(ArrayT const *A,
 		std::array<int, ArrayT::rank> const &sort_order,
 		DuplicatePolicy duplicate_policy = DuplicatePolicy::ADD,
-		bool zero_nan = false)
+		bool zero_nan = false);
+
+	/** @brief Produces the consolidated array.
+
+	This might be the original array called in the constructor, if
+	that was properly consolidated; or it might be a new array created
+	in this class. */
+	ArrayT const &operator()() {
+		return *Ap;
+	}
+};
+
+// -------------------- Method Definitions
+template<class ArrayT>
+Consolidate<ArrayT>::
+	Consolidate(ArrayT const *A,
+		std::array<int, ArrayT::rank> const &sort_order,
+		DuplicatePolicy duplicate_policy,
+		bool zero_nan)
 	{
 		if (A->sort_order == sort_order) {
 			// A is already consolidated, use it...
@@ -352,15 +407,7 @@ public:
 		}
 	}
 
-	/** @brief Produces the consolidated array.
 
-	This might be the original array called in the constructor, if
-	that was properly consolidated; or it might be a new array created
-	in this class. */
-	ArrayT const &operator()() {
-		return *Ap;
-	}
-};
 // -------------------------------------------------------------
 // --------------------------------------------------------
 /** @brief Internal class used by spsparse::sorted_permutation(). */
@@ -386,7 +433,7 @@ struct CmpIndex {
 		return arr->index(dim,i) < arr->index(dim,j);
 	}
 };
-
+// --------------------------------------------------------------------
 /** @brief Generates a permutation that, if applied, would result in the array being sorted.
 
 @param A Input array.
@@ -396,6 +443,10 @@ struct CmpIndex {
 @note Sorting is done in-place.  Elements added first will remain
       first, allowing for proper behavior of duplicate_policy in
       spsparse::consolidate(). */
+template<class CooArrayT>
+std::vector<size_t> sorted_permutation(CooArrayT const &A,
+	std::array<int, CooArrayT::rank> const &sort_order);
+
 template<class CooArrayT>
 std::vector<size_t> sorted_permutation(CooArrayT const &A,
 	std::array<int, CooArrayT::rank> const &sort_order)
