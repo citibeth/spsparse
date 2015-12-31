@@ -15,6 +15,7 @@
 #include <spsparse/algorithm.hpp>
 #include <spsparse/xiter.hpp>
 #include <spsparse/accum.hpp>
+#include <spsparse/blitz.hpp>
 
 namespace spsparse {
 
@@ -29,7 +30,8 @@ public:
 	typedef ValT val_type;
 	typedef std::array<index_type, rank> indices_type;
 
-	std::array<size_t, RANK> const shape;		// Extent of each dimension
+	std::array<size_t, RANK> shape;		// Extent of each dimension
+	void set_shape(std::array<size_t, RANK> const &_shape) { shape = _shape; }
 
 protected:
 	typedef CooArray<IndexT, ValT, RANK> ThisCooArrayT;
@@ -47,12 +49,20 @@ public:
 	bool edit_mode;		// Are we in edit mode?
 	std::array<int,RANK> sort_order;	// Non-negative elements if this is sorted
 
-
+	CooArray() : edit_mode(true), dim_beginnings_set(false), sort_order() {
+		sort_order[0] = -1;
+		for (int k=0; k<RANK; ++k) shape[k] = 0;	// User must set this later
+	}
 
 	CooArray(std::array<size_t, RANK> const &_shape)
 	: shape(_shape), edit_mode(true), dim_beginnings_set(false), sort_order() {
 		sort_order[0] = -1;
 	}
+
+	std::unique_ptr<ThisCooArrayT> new_blank() const
+		{ return std::unique_ptr<ThisCooArrayT>(new ThisCooArrayT(shape)); }
+	ThisCooArrayT make_blank() const
+		{ return ThisCooArrayT(shape); }
 
 	IndexT &index(int dim, size_t ix)
 		{ return index_vecs[dim][ix]; }
@@ -95,9 +105,7 @@ public:
 		sort_order(other.sort_order) {}
 
 	void operator=(ThisCooArrayT &&other) {
-		if (shape != other.shape) {
-			(*sparse_error)(-1, "Cannot change shape on assignment.");
-		}
+		shape = other.shape;
 		index_vecs = std::move(other.index_vecs);
 		val_vec = std::move(other.val_vec);
 		dim_beginnings_set = other.dim_beginnings_set;
@@ -117,9 +125,7 @@ public:
 		sort_order(other.sort_order) {}
 
 	void operator=(ThisCooArrayT const &other) {
-		if (shape != other.shape) {
-			(*sparse_error)(-1, "Cannot change shape on assignment.");
-		}
+		shape = other.shape;
 		index_vecs = other.index_vecs;
 		val_vec = other.val_vec;
 		dim_beginnings_set = other.dim_beginnings_set;
@@ -139,6 +145,7 @@ public:
 		dim_beginnings_set = false;
 		_dim_beginnings.clear();
 		edit_mode = true;
+		sort_order[0] = -1;
 	}
 
 	void reserve(size_t size) {
@@ -251,6 +258,7 @@ public:
 	void edit()
 	{
 		edit_mode = true;
+		sort_order[0] = -1;
 	}
 
 	void add(std::array<IndexT, RANK> const index, ValT const val)
@@ -312,23 +320,27 @@ public:
 
 	blitz::Array<ValT, RANK> to_dense()
 	{
-		blitz::Array<ValT, RANK> ret(0);
+		blitz::Array<ValT, RANK> ret(array_to_tiny<int,size_t,rank>(shape));
+		ret = 0;
 		DenseAccum<ThisCooArrayT> accum(ret);
 		copy(accum, *this);
 		return ret;
 	}
 
-	std::vector<size_t> &dim_beginnings()
+	// Sets and returns this->_dim_beginnings
+	std::vector<size_t> const &dim_beginnings() const
 	{
 		// See if we need to compute it; lazy eval
 		if (!dim_beginnings_set) {
-			this->_dim_beginnings = spsparse::dim_beginnings(*this);
-			dim_beginnings_set = true;
+			// Const cast OK here for lazy eval implementation
+			ThisCooArrayT *vthis = const_cast<ThisCooArrayT *>(this);
+			vthis->_dim_beginnings = spsparse::dim_beginnings(*this);
+			vthis->dim_beginnings_set = true;
 		}
 		return _dim_beginnings;
 	}
 
-	DimBeginningsXiter<ThisCooArrayT> dim_beginnings_xiter()
+	DimBeginningsXiter<ThisCooArrayT> dim_beginnings_xiter() const
 	{
 		auto &db(dim_beginnings());
 		int const index_dim = sort_order[0];

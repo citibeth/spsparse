@@ -51,17 +51,10 @@ public:
 	STLXiter(STLIter const &_begin, STLIter const &_end) :
 		begin(_begin), ii(_begin), end(_end) {}
 
-	bool eof()
-		{ return (ii == end); }
-
-	size_t offset()
-		{ return ii - begin; }
-
-	void operator++()
-		{ ++ii; }
-
-	auto operator*() -> decltype(*ii)
-		{ return *ii; }
+	bool eof() { return (ii == end); }
+	size_t offset() { return ii - begin; }
+	void operator++() { ++ii; }
+	auto operator*() -> decltype(*ii) { return *ii; }
 };
 
 /** Works for iterators with .val() method */
@@ -114,10 +107,7 @@ public:
 	Xiter3T i3;
 	int total_in_use;
 
-	bool eof()
-	{
-		return _eof;
-	}
+	bool eof() { return _eof; }
 
 	Join3Xiter(Xiter1T &&_i1, Xiter2T &&_i2, Xiter3T &&_i3) :
 		next_match(0),
@@ -152,7 +142,7 @@ public:
 };
 
 template<class Xiter1T, class Xiter2T, class Xiter3T>
-class Join3Xiter<Xiter1T, Xiter2T, Xiter3T> join2_xiter(Xiter1T &&i1, Xiter2T &&i2, Xiter3T &&i3)
+class Join3Xiter<Xiter1T, Xiter2T, Xiter3T> join3_xiter(Xiter1T &&i1, Xiter2T &&i2, Xiter3T &&i3)
 	{ return Join3Xiter<Xiter1T, Xiter2T, Xiter3T>(std::move(i1), std::move(i2), std::move(i3)); }
 
 // ========================================================

@@ -55,13 +55,13 @@ struct DenseAccum
 
 	DuplicatePolicy duplicate_policy;
 	blitz_type dense;
-	blitz::TinyVector<index_type, rank> bidx;
+	blitz::TinyVector<int, rank> bidx;
 
 	DenseAccum(blitz_type &_dense, DuplicatePolicy _duplicate_policy=DuplicatePolicy::ADD) : dense(_dense), duplicate_policy(_duplicate_policy) {}
 
 	void add(indices_type const &index, val_type const &val)
 	{
-		array_to_tiny<index_type, rank>(bidx, index);
+		array_to_tiny<int, index_type, rank>(bidx, index);
 
 		val_type &oval(dense(bidx));
 

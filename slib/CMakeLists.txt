@@ -5,6 +5,7 @@ include_directories(${PROJECT_SOURCE_DIR}/slib)
 add_library(spsparse SHARED
 	${EVERYTRACE_REFADDR}	# Blank if not USE_EVERYTRACE
 	spsparse/spsparse.cpp)
+target_link_libraries(spsparse ${EVERYTRACE_C_LIBRARY})
 install(TARGETS spsparse DESTINATION lib)
 
 # ------------ Header Files

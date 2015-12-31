@@ -42,16 +42,16 @@ std::vector<T> blitz_to_vector(blitz::Array<T,1> const &arr)
 	return ret;
 }
 // ------------------------------------------------------------------
-template<class T, int RANK>
-blitz::TinyVector<T, RANK> array_to_tiny(std::array<T, RANK> const &arr)
+template<class TinyT, class ArrayT, int RANK>
+blitz::TinyVector<TinyT, RANK> array_to_tiny(std::array<ArrayT, RANK> const &arr)
 {
-	blitz::TinyVector<T, RANK> ret;
+	blitz::TinyVector<TinyT, RANK> ret;
 	for (int k=0; k<RANK; ++k) ret[k] = arr[k];
 	return ret;
 }
 
-template<class T, int RANK>
-void array_to_tiny(blitz::TinyVector<T, RANK> ret, std::array<T, RANK> const &arr)
+template<class TinyT, class ArrayT, int RANK>
+void array_to_tiny(blitz::TinyVector<TinyT, RANK> &ret, std::array<ArrayT, RANK> const &arr)
 {
 	for (int k=0; k<RANK; ++k) ret[k] = arr[k];
 }

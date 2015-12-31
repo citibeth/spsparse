@@ -1,9 +1,10 @@
 // https://github.com/google/googletest/blob/master/googletest/docs/Primer.md
 
+#include <iostream>
+#include <random>
 #include <gtest/gtest.h>
 #include <spsparse/array.hpp>
 #include <spsparse/multiply_sparse.hpp>
-#include <iostream>
 #ifdef USE_EVERYTRACE
 #include <everytrace.h>
 #endif
@@ -36,67 +37,103 @@ protected:
 };
 
 
+#if 0
 TEST_F(SpSparseTest, CooArray)
 {
 	typedef CooArray<int, double, 2> CooArrayT;
 
 	CooMatrix<int, double> row({2,10});
-	row.add({0,8}, 5.);
+	row.add({0,8}, 6.);
 	row.add({0,4}, 4.);
 	row.add({0,0}, 2.);
 	row.add({0,3}, 3.);
-	row.add({1,7}, 3.);
-	row.consolidate({0,1});
-	auto rowdbxi(row.dim_beginnings_xiter());	// Iterate over rows
+	row.add({1,8}, 3.);
 
 	CooVector<int, double> scale({10});
 	scale.add({0}, 2.);
 //	scale.add({3}, 3.);
 	scale.add({4}, 4.);
-	scale.add({8}, 5.);
+	scale.add({8}, 4.);
 
 	CooMatrix<int, double> col({10,1});
 	col.add({0,0}, 2.);
 	col.add({3,0}, 3.);
 //	col.add({4,0}, 4.);
 	col.add({8,0}, 5.);
-	col.consolidate({1,0});
-	auto coldbxi(col.dim_beginnings_xiter());	// Iterate over cols
 
-	CooArray<int, double, 1> ret1({10});
-	multiply_row_scale_col
-#if 0
-		<decltype(rowdbxi.sub_xiter()),
-		decltype(make_val_xiter(scale.dim_begin(0), scale.dim_end(0))),
-		decltype(coldbxi.sub_xiter())>
-#endif
-	(ret1,
-		rowdbxi.sub_xiter(),
-		make_val_xiter(scale.dim_begin(0), scale.dim_end(0)),
-		coldbxi.sub_xiter());
 
-	// std::cout << ret1 << std::endl;
-
-	EXPECT_EQ(std::vector<int>({0,8}), blitz_to_vector(ret1.indices(0)));
-	EXPECT_EQ(std::vector<double>({8., 125.}), blitz_to_vector(ret1.vals()));
-
-	double sum1 = 0;
-	for (auto ii = ret1.begin(); ii != ret1.end(); ++ii) sum1 += ii.val();
-
-	// ------------------
+	// ------------------ Do the same single row-col test, but with "full" matrix mutliplier
 	CooVector<int, double> eye({10});
 	for (int i=0; i<10; ++i) eye.add({i}, 1.);
 
-	CooArray<int, double, 2> ret2({1,1});
+	CooArray<int, double, 2> ret2;
 	multiply(ret2, 1.0,
-		eye, row, eye, col, eye);
+		&eye, row, '.', &scale, col, '.', &eye);
+std::cout << "ret2: ";
+std::cout << ret2 << std::endl;
 
-	EXPECT_EQ(1, ret2.size());
-	EXPECT_EQ(0, ret2.index(0,0));	// dim, ix
-	EXPECT_EQ(0, ret2.index(1,0));
-	EXPECT_EQ(sum1, ret2.val(0));
+	EXPECT_EQ(2, ret2.size());
+	EXPECT_EQ(std::vector<int>({0,1}), blitz_to_vector(ret2.indices(0)));
+	EXPECT_EQ(std::vector<int>({0,0}), blitz_to_vector(ret2.indices(1)));	// j
+	EXPECT_EQ(std::vector<double>({128., 60.}), blitz_to_vector(ret2.vals()));
 }
 
+#endif
+
+// ------------------------------------------------------
+void test_random_multiply(unsigned int dsize, int seed)
+{
+	std::default_random_engine generator(seed);
+	auto dim_distro(std::bind(std::uniform_int_distribution<int>(0,dsize-1), generator));
+	auto val_distro(std::bind(std::uniform_real_distribution<double>(0,1), generator));
+
+	CooMatrix<int, double> A({dsize,dsize});
+	CooMatrix<int, double> B({dsize,dsize});
+	int nranda = (int)(val_distro() * (double)(dsize*dsize));
+	for (int i=0; i<nranda; ++i) A.add({dim_distro(), dim_distro()}, val_distro());
+	int nrandb = (int)(val_distro() * (double)(dsize*dsize));
+	for (int i=0; i<nrandb; ++i) B.add({dim_distro(), dim_distro()}, val_distro());
+
+	CooVector<int, double> eye({dsize});
+	for (int k=0; k<dsize; ++k) eye.add({k}, 1.0);
+
+// std::cout << "A: " << A << std::endl;
+// std::cout << "B: " << B << std::endl;
+
+	CooMatrix<int, double> C;
+	multiply(C,1.0,
+		(CooVector<int, double> *)0,	// scalei
+		A, '.',
+		&eye,	// scalej
+//		(CooVector<int, double> *)0,	// scalej
+		B, '.',
+		(CooVector<int, double> *)0);	// scalek
+
+// std::cout << "C: " << C << std::endl;
+
+	// --------- Compare to dense matrix multiplication
+	auto Ad(A.to_dense());
+	auto Bd(B.to_dense());
+	auto Cd(C.to_dense());
+
+	double usum = 0;
+	for (int i=0; i<dsize; ++i) {
+	for (int j=0; j<dsize; ++j) {
+		double sum=0;
+		for (int k=0; k<dsize; ++k) {
+			sum += Ad(i,k) * Bd(k,j);
+		}
+		EXPECT_DOUBLE_EQ(sum, Cd(i,j));
+		usum += sum;
+	}}
+	printf("seed = %d  sizes = [%ld, %ld, %ld]  usum = %f\n", seed, A.size(), B.size(), C.size(), usum);
+}
+
+TEST_F(SpSparseTest, random_multiply)
+{
+	for (int seed=1; seed<1000; ++seed)
+ 		test_random_multiply(5,seed);
+}
 
 int main(int argc, char **argv) {
 #ifdef USE_EVERYTRACE

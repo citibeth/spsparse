@@ -1,6 +1,7 @@
 #ifndef SPSPARSE_ALGORITHM_HPP
 #define SPSPARSE_ALGORITHM_HPP
 
+#include <memory>
 #include <spsparse/spsparse.hpp>
 #include <spsparse/xiter.hpp>
 
@@ -86,44 +87,56 @@ std::vector<size_t> dim_beginnings(CooArrayT const &A)
 		}
 	}
 
+#if 0
+std::cout << "dim_beginnings matrix = " << A << std::endl;
+printf("dim_beginnings(size=%ld) = [", A.size());
+for (auto ii(abegin.begin()); ii != abegin.end(); ++ii) {
+	printf("%d ", *ii);
+}
+printf("]\n");
+#endif
+
 	return abegin;
 }
 // ----------------------------------------------------------
 /** Iterates over one row/col at a time (in general, one index in a dimension).
 The underlying array must be sorted by that dimension. */
 template<class CooArrayT>
-class DimBeginningsXiter : public STLXiter<std::vector<size_t>::iterator>
+class DimBeginningsXiter : public STLXiter<std::vector<size_t>::const_iterator>
 {
 public:
 	SPSPARSE_LOCAL_TYPES(CooArrayT);
-	typedef std::vector<size_t>::iterator DimIterT;
+	typedef std::vector<size_t>::const_iterator DimIterT;
 
 protected:
-	CooArrayT *arr;
+	CooArrayT const *arr;
 	int index_dim;	// Dimension corresponding to our "rows"
 	int val_dim;	// Dimension corresponding to our "cols"
 
 public:
 	DimBeginningsXiter(
-		CooArrayT *_arr,
+		CooArrayT const *_arr,
 		int _index_dim, int _val_dim,
 		DimIterT const &dim_beginnings_begin,
 		DimIterT const &dim_beginnings_end)
-	: STLXiter<std::vector<size_t>::iterator>(dim_beginnings_begin, dim_beginnings_end),
+	: STLXiter<std::vector<size_t>::const_iterator>(dim_beginnings_begin, dim_beginnings_end),
 		arr(_arr), index_dim(_index_dim), val_dim(_val_dim)
 	{}
+
+	// Remember the sentinel at the end!
+	bool eof() { return ((ii+1) == end); }
 
 	index_type operator*()
 		{ return arr->index(index_dim, *ii); }
 
 	/** Returns an Xiter along the current row/col in the CooArray. */
-	typedef ValSTLXiter<typename CooArrayT::dim_iterator> SubXiterT;
-	SubXiterT sub_xiter(int _val_dim = -1)
+	typedef ValSTLXiter<typename CooArrayT::const_dim_iterator> sub_xiter_type;
+	sub_xiter_type sub_xiter(int _val_dim = -1)
 	{
 		if (_val_dim < 0) _val_dim = val_dim;
 		size_t a0 = *ii;
 		size_t a1 = *(ii + 1);
-		return SubXiterT(arr->dim_iter(_val_dim, a0), arr->dim_iter(_val_dim, a1));
+		return sub_xiter_type(arr->dim_iter(_val_dim, a0), arr->dim_iter(_val_dim, a1));
 	}
 
 	// No val()
@@ -134,14 +147,14 @@ void consolidate(AccumulatorT &ret,
 	CooArrayT const &A,
 	std::array<int, CooArrayT::rank> const &sort_order,
 	DuplicatePolicy duplicate_policy = DuplicatePolicy::ADD,
-	bool handle_nan = false)	// TODO: This is currently ignored!
+	bool zero_nan = false)	// Treat NaN like 0
 {
 	const int RANK = CooArrayT::rank;
 	typedef typename CooArrayT::index_type IndexT;
 	typedef typename CooArrayT::val_type ValT;
 
-	// Nothing to do for zero-size matrices (or ones with just one element)
-	if (A.size() > 1) {
+	// Nothing to do for zero-size matrices
+	if (A.size() > 0) {
 
 		// Get a sorted permutation
 		std::vector<size_t> perm(sorted_permutation(A, sort_order));
@@ -152,7 +165,7 @@ void consolidate(AccumulatorT &ret,
 		// Skip over initial 0 and NaN
 		for (;; ++ii) {
 			if (ii == perm.end()) goto finished;		// Nothing more to do
-			if (!std::isnan(A.val(*ii)) && A.val(*ii) != 0) break;
+			if (!isnone(A.val(*ii), zero_nan)) break;
 		}
 
 		// New temporary entry
@@ -169,7 +182,7 @@ void consolidate(AccumulatorT &ret,
 
 					goto finished;		// Nothing more to do
 				}
-				if (!std::isnan(A.val(*ii)) && A.val(*ii) != 0) break;
+				if (!isnone(A.val(*ii))) break;
 			}
 
 			// Test if A.index(*ii) == accum_idx
@@ -199,6 +212,36 @@ finished:
 	ret.set_sorted(sort_order);
 }
 // -----------------------------------------------------
+/* Consolidates an array, if it is not already consolidated.
+Does not overwrite the original. */
+template<class ArrayT>
+class Consolidate
+{
+	static const int rank = ArrayT::rank;
+	std::unique_ptr<ArrayT> A2;		// If needed.
+	ArrayT const *Ap;						// The final answer
+public:
+	Consolidate(ArrayT const *A,
+		std::array<int, ArrayT::rank> const &sort_order,
+		DuplicatePolicy duplicate_policy = DuplicatePolicy::ADD,
+		bool zero_nan = false)
+	{
+		if (A->sort_order == sort_order) {
+			// A is already consolidated, use it...
+			Ap = A;
+		} else {
+			// Must consolidate A...
+			A2 = A->new_blank();
+			Ap = A2.get();
+			consolidate(*A2, *A, sort_order, duplicate_policy, zero_nan);
+		}
+	}
+
+	ArrayT const &operator()() {
+		return *Ap;
+	}
+};
+// -------------------------------------------------------------
 // --------------------------------------------------------
 template<class CooArrayT>
 struct CmpIndex {

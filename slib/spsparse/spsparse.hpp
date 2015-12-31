@@ -40,7 +40,22 @@ extern error_ptr sparse_error;
 // -------------------------------------------------------------
 // Values for sort_order formal parameter below
 extern const std::array<int,2> ROW_MAJOR;
-extern const std::array<int,2> COLUMN_MAJOR;
+extern const std::array<int,2> COL_MAJOR;
+
+// The expression "std::isnan(n) || (n == 0)" for different data types.
+// Use template specilization here...
+template<class NumT>
+inline bool isnone(NumT const n, bool const zero_nan=false)
+{
+	if (zero_nan) {
+		return std::isnan(n) || (n == 0);
+	} else {
+		return (n == 0);
+	}
+}
+
+// ----------------------------------------------------------
+} // Namespace
 
 // -------------------------------------------------------------
 /** Hack to write std::array to ostream. */
@@ -54,7 +69,7 @@ std::ostream &stream(std::ostream &os, T const * const a, int RANK)
 		os << "{}";
 	} else {
 		os << "{";
-		for (int k=0; ; ++k) {
+		for (int k=0; ; ) {
 			os << a[k];
 			++k;
 			if (k == RANK) break;
@@ -66,5 +81,4 @@ std::ostream &stream(std::ostream &os, T const * const a, int RANK)
 }
 
 
-}	// namespace
 #endif // Guard
