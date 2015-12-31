@@ -81,7 +81,7 @@ std::cout << ret2 << std::endl;
 #endif
 
 // ------------------------------------------------------
-void test_random_multiply(unsigned int dsize, int seed)
+void test_random_MM_multiply(unsigned int dsize, int seed)
 {
 	std::default_random_engine generator(seed);
 	auto dim_distro(std::bind(std::uniform_int_distribution<int>(0,dsize-1), generator));
@@ -126,15 +126,82 @@ void test_random_multiply(unsigned int dsize, int seed)
 		EXPECT_DOUBLE_EQ(sum, Cd(i,j));
 		usum += sum;
 	}}
-	printf("seed = %d  sizes = [%ld, %ld, %ld]  usum = %f\n", seed, A.size(), B.size(), C.size(), usum);
+	printf("MM seed = %d  sizes = [%ld, %ld, %ld]  usum = %f\n", seed, A.size(), B.size(), C.size(), usum);
 }
 
-TEST_F(SpSparseTest, random_multiply)
+TEST_F(SpSparseTest, random_MM_multiply)
 {
 	for (int seed=1; seed<1000; ++seed)
- 		test_random_multiply(5,seed);
+ 		test_random_MM_multiply(5,seed);
+}
+// ---------------------------------------------------------
+void test_random_MV_multiply(unsigned int dsize, int seed)
+{
+	std::default_random_engine generator(seed);
+	auto dim_distro(std::bind(std::uniform_int_distribution<int>(0,dsize-1), generator));
+	auto val_distro(std::bind(std::uniform_real_distribution<double>(0,1), generator));
+
+	CooMatrix<int, double> A({dsize,dsize});
+	CooVector<int, double> B({dsize});
+	int nranda = (int)(val_distro() * (double)(dsize*dsize));
+	for (int i=0; i<nranda; ++i) A.add({dim_distro(), dim_distro()}, val_distro());
+	int nrandb = (int)(val_distro() * (double)dsize);
+	for (int i=0; i<nrandb; ++i) B.add({dim_distro()}, val_distro());
+
+	CooVector<int, double> eye({dsize});
+	for (int k=0; k<dsize; ++k) eye.add({k}, 1.0);
+
+// std::cout << "A: " << A << std::endl;
+// std::cout << "B: " << B << std::endl;
+
+	CooVector<int, double> C;
+	multiply(C,1.0,
+		(CooVector<int, double> *)0,	// scalei
+		A, '.',
+//		&eye,	// scalej
+		(CooVector<int, double> *)0,	// scalej
+		B);
+
+// std::cout << "C: " << C << std::endl;
+
+	// --------- Compare to dense matrix multiplication
+	auto Ad(A.to_dense());
+	auto Bd(B.to_dense());
+//printf("Bd: [");
+//for (int i=0; i<dsize; ++i) printf("%g ", Bd(i));
+//printf("\n");
+	auto Cd(C.to_dense());
+
+	double usum = 0;
+	bool err = false;
+	for (int i=0; i<dsize; ++i) {
+		double sum=0;
+		for (int k=0; k<dsize; ++k) {
+//printf("pair: (%d %d) %g*%g=%g\n", i,k, Ad(i,k), Bd(k), Ad(i,k)*Bd(k));
+			sum += Ad(i,k) * Bd(k);
+		}
+		if (sum != Cd(i)) {
+			printf("(%d): %g vs %g\n", i,sum, Cd(i));
+
+			FAIL() << "Error on multiply" << std::endl
+				<< "    A: " << A << std::endl
+				<< "    B: " << B << std::endl
+				<< "    C: " << C << std::endl;
+			goto break_mult;
+		}
+		usum += sum;
+	}
+break_mult:
+	printf("MV seed = %d  sizes = [%ld, %ld, %ld]  usum = %f\n", seed, A.size(), B.size(), C.size(), usum);
 }
 
+TEST_F(SpSparseTest, random_MV_multiply)
+{
+	for (int seed=1; seed<1000; ++seed) {
+ 		test_random_MV_multiply(5,seed);
+	}
+}
+// -----------------------------------------------------------
 int main(int argc, char **argv) {
 #ifdef USE_EVERYTRACE
 	everytrace_init();

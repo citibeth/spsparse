@@ -73,9 +73,7 @@ std::unique_ptr<MultXiter<MatT>> new_mult_xiter(MatT const &A, ScaleT const *sca
 
 };
 // -------------------------------------------------------------
-/** NOTES:
-A must be consolidated ROW_MAJOR, B must be consolidated COLUMN_MAJOR
-*/
+/** Matrix-matrix multiply */
 template<class ScaleIT, class MatAT, class ScaleJT, class MatBT, class ScaleKT, class AccumulatorT>
 static void multiply(
 	AccumulatorT &ret,
@@ -95,6 +93,11 @@ static void multiply(
 	std::array<int,2> const &b_sort_order(transpose_B == 'T' ? ROW_MAJOR : COL_MAJOR);
 	ret.set_shape({A.shape[a_sort_order[0]], B.shape[b_sort_order[0]]});
 
+	// Check inner dimensions
+	if (A.shape[a_sort_order[1]] != B.shape[b_sort_order[1]]) {
+		(*sparse_error)(-1, "Inner dimensions for A (%ld) and B (%ld) must match!", A.shape[a_sort_order[1]], B.shape[b_sort_order[1]]);
+	}
+
 	// Short-circuit return on empty output
 	// (DimBeginningXiter doesn't like size()==0)
 	if ((isnone(C)) 
@@ -108,8 +111,6 @@ static void multiply(
 	// --------- Consolidate the matrices if needed
 	Consolidate<MatAT> Acon(&A, a_sort_order, duplicate_policy, zero_nan);
 	Consolidate<MatBT> Bcon(&B, b_sort_order, duplicate_policy, zero_nan);
-
-//	ret.set_shape({Acon().shape[Acon().sort_order[0]], Bcon().shape[Bcon().sort_order[0]]});
 
 	// Multiply each row by each column
 	// ------ Loop 1: Rows in A	
@@ -170,156 +171,96 @@ printf("set: (%d %d : %g)\n", aix, bix, sum * C * a_scale * b_scale);
 	}
 
 }
-
-#if 0
-/** NOTES:
-A must be consolidated ROW_MAJOR, B must be consolidated COLUMN_MAJOR
-*/
-template<class ScaleIT, class MatAT, class ScaleJT, class MatBT, class ScaleKT, class AccumulatorT>
+// ------------------------------------------------------------
+/** Matrix-vector multiply */
+template<class ScaleIT, class MatAT, class ScaleJT, class VecT, class AccumulatorT>
 static void multiply(
 	AccumulatorT &ret,
 	double C,		// Multiply everything by this
-	ScaleIT const &scalei,		// Vector
-	MatAT   &A,			// Matrix
-	ScaleJT const &scalej,		// Vector
-	MatBT   &B,			// Matrix
-	ScaleKT const &scalek)		// Vector
+	ScaleIT const *scalei,
+	MatAT const &A,
+	char transpose_A,			// 'T' for transpose, '.' otherwise
+	ScaleJT const *scalej,		// Vector
+	VecT const &V,
+	DuplicatePolicy duplicate_policy = DuplicatePolicy::ADD,
+	bool zero_nan = false)
 {
+	// Set dimensions of output, even if we store nothing in it.
+	std::array<int,2> const &a_sort_order(transpose_A == 'T' ? COL_MAJOR : ROW_MAJOR);
+	ret.set_shape({A.shape[a_sort_order[0]]});
 
-//Check dimensions...?
+	// Check inner dimensions
+	if (A.shape[a_sort_order[1]] != V.shape[0]) {
+		(*sparse_error)(-1, "Inner dimensions for A (%ld) and V (%ld) must match!", A.shape[a_sort_order[1]], V.shape[0]);
+	}
 
-	if (C == 0) return;		// Everything will be zero, so give up now!
+	// Short-circuit return on empty output
+	// (DimBeginningXiter doesn't like size()==0)
+	if ((isnone(C)) 
+		|| (scalei && scalei->size() == 0)
+		|| (A.size() == 0)
+		|| (scalej && scalej->size() == 0)
+		|| (V.size() == 0))
+	{ return; }
 
-	// This will do nothing if they're already consolidated
-	A.consolidate({0,1});
-	B.consolidate({1,0});
+	// --------- Consolidate the matrices if needed
+	Consolidate<MatAT> Acon(&A, a_sort_order, duplicate_policy, zero_nan);
+	Consolidate<VecT> Vcon(&V, {0}, duplicate_policy, zero_nan);
+
+//std::cout << "Vcon: " << Vcon() << std::endl;
 
 	// Multiply each row by each column
-	// ------ Outer loop: Rows in A
-	for (auto join_a(join2_xiter(
-		make_val_xiter(scalei.dim_begin(0), scalei.dim_end(0)),
-		A.dim_beginnings_xiter()));
-		!join_a.eof(); ++join_a)
+	// ------ Loop 1: Rows in A	
+	for (auto join_a(new_mult_xiter(Acon(), scalei));
+		!join_a->eof(); ++(*join_a))
 	{
-
-		// -------- Inner loop: Cols in B
-		for (auto join_b(join2_xiter(
-			B.dim_beginnings_xiter(),
-			make_val_xiter(scalek.dim_begin(0), scalek.dim_end(0))));
-			!join_b.eof(); ++join_b)
-		{
-
-			// ---------- Inside of loop
-			// Multiply A row by B column
-			ScalarAccumulator<typename MatAT::index_type, typename MatAT::val_type, 2> rcval;
-			multiply_row_scale_col(rcval,
-				join_a.i2.sub_xiter(),
-				make_val_xiter(scalej.dim_begin(0), scalej.dim_end(0)),
-				join_b.i1.sub_xiter());
-
-			double val = C * join_a.i1.val() * rcval.val * join_b.i2.val();
-			if (val == 0) continue;
-
-			// *a_ii == index of current row in A
-printf("answer add %d %d: %g\n", *join_a.i2, *join_b.i1, val);
-			ret.add({*join_a.i2, *join_b.i1}, val);
-		}
-	}
-}
-#endif
-
-
-
+		if (isnone(join_a->scale_val())) continue;
+		auto aix(join_a->index());
+		auto a_scale(join_a->scale_val());
 
 #if 0
+printf("Starting row %d:", aix);
+for (auto ii=join_a->sub_xiter(); !ii.eof(); ++ii) {
+	printf(" (%d : %g)", *ii, ii.val());
+	}
+printf("\n");
+#endif
+		// ---------- Loop 3: Multiply A row by the single B column
+		typename AccumulatorT::val_type sum = 0;
 
-
-/** NOTES:
-A must be consolidated ROW_MAJOR, B must be consolidated COLUMN_MAJOR
-*/
-template<class IndexT, class ValueT, class AccumulatorT>
-static double multiply(
-	AccumulatorT &ret,
-	CooVector<IndexT, ValueT> const *scalei,
-	CooMatrix<IndexT, ValueT> const &A,
-	CooVector<IndexT, ValueT> const &b)
-{
-	std::vector<size_t> abegin(get_rowcol_beginnings(A, 0));
-	std::vector<size_t> bbegin(get_rowcol_beginnings(B, 1));
-
-	// Multiply each row by each column
-
-	// ---------- Outer loop: rows in A
-	size_t ai = 0;
-	size_t sii = 0;		// Index into sparse scalei representation
-	IndexT next_match_a = A.indices[0][ai];
-	if (scalei) next_match_a = std::max(next_match_a, scalei->indices[0][sii]);
-	for (;; ++ai, ++sii) {
-		// ---- Increment forward to the next row in A w/ matching scalei
-		if (!scalei) {
-			if (ai >= abegin.size()-1) goto break_outer;
+		if (scalej) {
+			// ----- With scalej
+			for (auto ab(join3_xiter(
+				join_a->sub_xiter(),
+				make_val_xiter(scalej->dim_begin(0), scalej->dim_end(0)),
+				make_val_xiter(Vcon().dim_begin(0), Vcon().dim_end(0))));
+				!ab.eof(); ++ab)
+			{ sum += ab.i1.val() * ab.i2.val() * ab.i3.val(); }
 		} else {
-			for (;;++ai) {
-				if (ai >= abegin.size()-1) goto break_outer;
-				if (A.indices[0][ai] >= netxt_match_a) break;
+			// ----- Without scalej
+			for (auto ab(join2_xiter(
+				join_a->sub_xiter(),
+				make_val_xiter(Vcon().dim_begin(0), Vcon().dim_end(0))));
+				!ab.eof(); ++ab)
+			{
+//printf("    triplet %d=?%d: %g*%g = %g\n", *ab.i1, *ab.i2, ab.i1.val(), ab.i2.val(), ab.i1.val()*ab.i2.val());
+				sum += ab.i1.val() * ab.i2.val();
 			}
-			next_match_a = A.indices[0][ai];
-
-			for (;;++sii) {
-				if (si >= scalei->size()) goto break_outer;
-				if (scalei->indices[0][sii] >= next_match_a) break;
-			}
-			next_match_a = scalei->indices[0][sii];
 		}
 
-		ValueT sival;
-		if (!scalei) {
-			sival = 1.0;
-		} else {
-			sival = scalei->indices[0][sii];
-			if (sival == 0) continue;
+		if (!isnone(sum)) {
+#if 0
+printf("    set: (%d : %g)\n", aix, sum * C * a_scale);
+#endif
+			ret.add({aix}, sum * C * a_scale);
 		}
-
-		// ------------ Just one column of b
-
-		// Multiply a row by a column
-		IndexT const a0 = abegin[ai];
-		ScalarAccumulator<IndexT, ValueT, RANK> rcval;
-		multiply_row_col(rcval,
-			&A.indices[0][a0], &A.vals[a0], abegin[ai+1]-a0,
-			0, 0, 0, 0,
-			&b.indices[0][0], &b.vals[0], b.size())
-			handle_nan);
-
-		double val = sival * rcval.value();
-		if (val == 0) continue;
-
-		IndexT aRow = a.indices[0][a0];
-		ret.add({{aRow}}, val);
 
 	}
-	break_outer: ;
 
 }
 
 
 
-template<class IndexT, class ValueT, class AccumulatorT>
-static double multiply(
-	AccumulatorT &ret,
-	CooVector<IndexT, ValueT> const &A,
-	CooVector<IndexT, ValueT> const &B,
-	bool handle_nan = false)
-{
-	multiply_row_col(ret,
-		&a.indices[0][0], &a.vals[0], a.size(),
-		0, 0, 0, 0,
-		&b.indices[0][0], &b.vals[0], b.size())
-		handle_nan);
-}
-
-
-#endif
 
 
 } // namespace
