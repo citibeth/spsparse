@@ -7,4 +7,5 @@ cmake \
 	-DBLITZ++_PKGCONF_LIBRARY_DIRS=$MACPORTS/lib \
 	"$@"
 
+# Optimization won't matter, this is mostly a header-only library.
 #	-DCMAKE_CXX_FLAGS=-O3 \

@@ -15,8 +15,10 @@ namespace spsparse {
 // Temporarily comment out NetCDF stuff.
 // Not sure if it belongs in the core class.
 
+template<class ArrayT>
  void netcdf_define(
 	netCDF::NcFile &nc, std::string const &vname,
+	ArrayT const &A,
 	std::vector<std::function<void ()>> &writes) const
 {
 	NcDim size_d = nc.addDim(vname + ".size", this->size());
@@ -33,7 +35,9 @@ namespace spsparse {
 }
 
 
-void netcdf_write(NcFile &nc, std::string const &vname) const
+void netcdf_write(
+	netCDF::NcFile &nc, std::string const &vname, const
+	ArrayT const &A)
 {
 	NcVar indices_v = nc.getVar(vname + ".index");
 	NcVar vals_v = nc.getVar(vname + ".val");
