@@ -89,9 +89,9 @@ public:
 
 
 
-	blitz::Array<IndexT, 1> indices(int dim)
+	blitz::Array<IndexT, 1> indices(int dim) const
 		{ return vector_to_blitz(index_vecs[dim]); }
-	blitz::Array<ValT, 1> vals()
+	blitz::Array<ValT, 1> vals() const
 		{ return vector_to_blitz(val_vec); }
 
 	// Move semantics

@@ -24,7 +24,18 @@ include (setup_rpath)
 # --------------------- Define our toolchain
 
 find_package(gtest REQUIRED)
+find_package(ibmisc REQUIRED)
 find_package(Blitz++ REQUIRED)
+find_package(netcdf4_c REQUIRED)
+find_package(netcdf4_cxx REQUIRED)
+
+include_directories(${BLITZ++_INCLUDE_DIR})
+
+include_directories(${NETCDF4_C_INCLUDE_DIR})
+include_directories(${NETCDF4_CXX_INCLUDE_DIR})
+include_directories(${IBMISC_INCLUDE_DIR})
+
+set(ALL_LIBS ${EVERYTRACE_C_LIBRARY} ${IBMISC_LIBRARY} ${NETCDF4_CXX_LIBRARY})
 
 # -------- Process subdirectories of the build
 add_subdirectory(slib)

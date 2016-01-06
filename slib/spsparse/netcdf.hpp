@@ -1,6 +1,8 @@
 #ifndef SPSPARSE_NETCDF_HPP
 #define SPSPARSE_NETCDF_HPP
 
+#include <functional>
+#include <ibmisc/ncutil.hpp>
 #include <spsparse/array.hpp>
 
 namespace spsparse {
@@ -11,50 +13,65 @@ namespace spsparse {
 @{
 */
 
-// These need to move outside of the CooArray class.
-// Temporarily comment out NetCDF stuff.
-// Not sure if it belongs in the core class.
+template<class ArrayT>
+void nc_write(
+	netCDF::NcFile *nc,
+	std::string const &vname,
+	ArrayT const *A);
 
 template<class ArrayT>
- void netcdf_define(
-	netCDF::NcFile &nc, std::string const &vname,
-	ArrayT const &A,
-	std::vector<std::function<void ()>> &writes) const
+void nc_write(
+	netCDF::NcFile *nc,
+	std::string const &vname,
+	ArrayT const *A)
 {
-	NcDim size_d = nc.addDim(vname + ".size", this->size());
-	NcDim rank_d = nc.addDim(vname + ".rank", RANK);
-	nc.add_var(vname + ".indices", ncInt, {size_d, rank_d});
-	nc.add_var(vname + ".vals", ncDouble, {size_d});
+	netCDF::NcVar indices_v = nc->getVar(vname + ".indices");
+	netCDF::NcVar vals_v = nc->getVar(vname + ".vals");
 
-	one_d = getOrAddDim(nc, "one", 1);
-	auto descrVar = nc.add_var(vname + ".descr", ncInt, {one_d});	// TODO: This should be ".info"
-	descrVar.putAtt("shape", ncLong, RANK, &shape);
+	std::vector<size_t> startp0 = {0};
+	std::vector<size_t> countp0 = {A->size()};
+	blitz::Array<typename ArrayT::val_type, 1> vals(A->vals());
+	vals_v.putVar(startp0, countp0, &vals(0));
 
-	writes.push_back(&CooArray<IndexT,ValT,RANK>::netcdf_write,
-		this, &nc, vname);
-}
-
-
-void netcdf_write(
-	netCDF::NcFile &nc, std::string const &vname, const
-	ArrayT const &A)
-{
-	NcVar indices_v = nc.getVar(vname + ".index");
-	NcVar vals_v = nc.getVar(vname + ".val");
-
-	vals_v.putVar(val_vec, size());
-
-	std::vector<size_t> startp(2) = {0, 0};		// SIZE, RANK
-	std::vector<size_t> countp(2) = {1, RANK};	// Write RANK elements at a time
-	for (auto ov = this->begin(); ov != this->end(); ++ov) {
-		std::array<size_t> index = index();
+	std::vector<size_t> startp = {0, 0};		// SIZE, RANK
+	std::vector<size_t> countp = {1, A->rank};	// Write RANK elements at a time
+	for (auto ov = A->begin(); ov != A->end(); ++ov) {
+		typename ArrayT::indices_type index = ov.index();
 
 		indices_v.putVar(startp, countp, &index[0]);	// 2-D
-		vals_v.putVar(startp, countp, &ov.val());	// 1-D
+		typename ArrayT::val_type val = ov.val();
+		vals_v.putVar(startp, countp, &val);	// 1-D
 
 		++startp[0];
 	}
 }
+
+template<class ArrayT>
+ void nc_define(
+	netCDF::NcFile &nc, std::string const &vname,
+	ArrayT const &A,
+	ibmisc::NcWrites &writes);
+
+template<class ArrayT>
+ void nc_define(
+	netCDF::NcFile &nc,
+	std::string const &vname,
+	ArrayT const &A,
+	ibmisc::NcWrites &writes)
+{
+	netCDF::NcDim size_d = nc.addDim(vname + ".size", A.size());
+	netCDF::NcDim rank_d = nc.addDim(vname + ".rank", A.rank);
+	nc.addVar(vname + ".indices", netCDF::ncInt, {size_d, rank_d});
+	nc.addVar(vname + ".vals", netCDF::ncDouble, {size_d});
+
+	auto one_d = ibmisc::getOrAddDim(nc, "one", 1);
+	auto infoVar = nc.addVar(vname + ".info", netCDF::ncInt, {one_d});
+	infoVar.putAtt("shape", netCDF::ncInt64, A.rank, &A.shape[0]);
+
+	writes += std::bind(&nc_write<ArrayT>, &nc, vname, &A);
+}
+
+
 
 /** @} */
 
