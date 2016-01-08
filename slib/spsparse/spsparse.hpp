@@ -51,7 +51,7 @@ main program, to fit into some larger error handling system (eg:
 Everytrace).
 
 https://github.com/citibob/everytrace */
-extern error_ptr sparse_error;
+extern error_ptr spsparse_error;
 
 /** @brief Promote relevant template parameters.
 

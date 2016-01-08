@@ -2,7 +2,7 @@
 #define SPSPARSE_NETCDF_HPP
 
 #include <functional>
-#include <ibmisc/ncutil.hpp>
+#include <ibmisc/netcdf.hpp>
 #include <spsparse/array.hpp>
 
 namespace spsparse {
@@ -14,61 +14,127 @@ namespace spsparse {
 */
 
 template<class ArrayT>
-void nc_write(
-	netCDF::NcFile *nc,
-	std::string const &vname,
-	ArrayT const *A);
+void nc_write_spsparse(
+	netCDF::NcGroup *nc,
+	ArrayT *A,
+	std::string const &vname);
+
 
 template<class ArrayT>
-void nc_write(
-	netCDF::NcFile *nc,
-	std::string const &vname,
-	ArrayT const *A)
+void nc_write_spsparse(
+	netCDF::NcGroup *nc,
+	ArrayT *A,
+	std::string const &vname)
 {
+	std::array<size_t, ArrayT::rank> shape;		// Extent of each dimension
+
 	netCDF::NcVar indices_v = nc->getVar(vname + ".indices");
 	netCDF::NcVar vals_v = nc->getVar(vname + ".vals");
 
-	std::vector<size_t> startp0 = {0};
-	std::vector<size_t> countp0 = {A->size()};
-	blitz::Array<typename ArrayT::val_type, 1> vals(A->vals());
-	vals_v.putVar(startp0, countp0, &vals(0));
-
 	std::vector<size_t> startp = {0, 0};		// SIZE, RANK
 	std::vector<size_t> countp = {1, A->rank};	// Write RANK elements at a time
-	for (auto ov = A->begin(); ov != A->end(); ++ov) {
-		typename ArrayT::indices_type index = ov.index();
+	for (auto ii = A->begin(); ii != A->end(); ++ii, ++startp[0]) {
+		typename ArrayT::indices_type index = ii.index();
+		typename ArrayT::val_type val = ii.val();
 
-		indices_v.putVar(startp, countp, &index[0]);	// 2-D
-		typename ArrayT::val_type val = ov.val();
-		vals_v.putVar(startp, countp, &val);	// 1-D
+		indices_v.putVar(startp, countp, &index[0]);
+		vals_v.putVar(startp, countp, &val);
+	}
+}
+// --------------------------------------------------------
 
-		++startp[0];
+template<class AccumulatorT>
+void nc_read_spsparse(
+	netCDF::NcGroup *nc,
+	AccumulatorT *A,
+	std::string const &vname);
+
+template<class AccumulatorT>
+void nc_read_spsparse(
+	netCDF::NcGroup *nc,
+	AccumulatorT *A,
+	std::string const &vname)
+{
+	std::array<size_t, AccumulatorT::rank> shape;		// Extent of each dimension
+
+	netCDF::NcVar indices_v = nc->getVar(vname + ".indices");
+	netCDF::NcVar vals_v = nc->getVar(vname + ".vals");
+
+	size_t size = vals_v.getDim(0).getSize();	// # non-zero elements
+
+	std::vector<size_t> startp = {0, 0};		// SIZE, RANK
+	std::vector<size_t> countp = {1, AccumulatorT::rank};	// Write RANK elements at a time
+	std::array<typename AccumulatorT::index_type, AccumulatorT::rank> index;
+	typename AccumulatorT::val_type val;
+
+	for (; startp[0]<size; ++startp[0]) {
+		indices_v.getVar(startp, countp, &index[0]);
+		vals_v.getVar(startp, countp, &val);
+
+		A->add(index, val);
 	}
 }
 
+// -----------------------------------------------------------------
 template<class ArrayT>
- void nc_define(
-	netCDF::NcFile &nc, std::string const &vname,
-	ArrayT const &A,
-	ibmisc::NcWrites &writes);
+void ncio_spsparse(
+	ibmisc::NcIO &ncio,
+	ArrayT &A,
+	bool alloc,
+	std::string const &vname);
 
 template<class ArrayT>
- void nc_define(
-	netCDF::NcFile &nc,
-	std::string const &vname,
-	ArrayT const &A,
-	ibmisc::NcWrites &writes)
+void ncio_spsparse(
+	ibmisc::NcIO &ncio,
+	ArrayT &A,
+	bool alloc,
+	std::string const &vname)
 {
-	netCDF::NcDim size_d = nc.addDim(vname + ".size", A.size());
-	netCDF::NcDim rank_d = nc.addDim(vname + ".rank", A.rank);
-	nc.addVar(vname + ".indices", netCDF::ncInt, {size_d, rank_d});
-	nc.addVar(vname + ".vals", netCDF::ncDouble, {size_d});
+	std::vector<std::string> const dim_names({vname + ".size", vname + ".rank"});
+	std::vector<netCDF::NcDim> dims;		// Dimensions in NetCDF
 
-	auto one_d = ibmisc::getOrAddDim(nc, "one", 1);
-	auto infoVar = nc.addVar(vname + ".info", netCDF::ncInt, {one_d});
-	infoVar.putAtt("shape", netCDF::ncInt64, A.rank, &A.shape[0]);
+	std::vector<size_t> dim_sizes;			// Length of our two dimensions.
 
-	writes += std::bind(&nc_write<ArrayT>, &nc, vname, &A);
+	// Allocate the output, if we're reading
+	if (ncio.rw == 'w') {
+		dims = ibmisc::get_or_add_dims(ncio, dim_names, {A.size(), A.rank});
+
+		auto info_v = get_or_add_var(ncio, vname + ".info", netCDF::ncInt64, {});
+		info_v.putAtt("shape", netCDF::ncUint64, A.rank, &A.shape[0]);
+
+		get_or_add_var(ncio, vname + ".indices", netCDF::ncInt64, dims);
+		get_or_add_var(ncio, vname + ".vals", netCDF::ncDouble, {dims[0]});
+		ncio += std::bind(&nc_write_spsparse<ArrayT>, ncio.nc, &A, vname);
+	} else {
+		dims = ibmisc::get_dims(ncio, dim_names);
+
+		// Read
+		netCDF::NcVar info_v = ncio.nc->getVar(vname + ".info");
+		auto shape_a = info_v.getAtt("shape");
+
+		// Check the rank in NetCDF matches SpSparse rank
+		size_t rank = shape_a.getAttLength();
+		if (rank != ArrayT::rank) {
+			(*spsparse_error)(-1,
+				"Trying to read NetCDF sparse array of rank %ld into SpSparse array of rank %d",
+				rank, ArrayT::rank);
+		}
+
+		if (alloc) {
+			// Allocate + Read
+
+			// Check the shape of the sparse array
+			std::array<size_t, ArrayT::rank> shape;
+			shape_a.getValues(&shape[0]);
+
+			// Reserve space for the non-zero elements
+			A.clear();
+			A.set_shape(shape);
+			A.reserve(ncio.nc->getDim(vname + ".size").getSize());
+		}
+
+		ncio += std::bind(&nc_read_spsparse<ArrayT>, ncio.nc, &A, vname);
+	}
 }
 
 

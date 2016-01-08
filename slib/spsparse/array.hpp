@@ -328,7 +328,7 @@ template<class IndexT, class ValT, int RANK>
 	void CooArray<IndexT, ValT, RANK>::add(std::array<IndexT, RANK> const index, ValT const val)
 	{
 		if (!edit_mode) {
-			(*sparse_error)(-1, "Must be in edit mode to use CooArray::add()");
+			(*spsparse_error)(-1, "Must be in edit mode to use CooArray::add()");
 		}
 
 		// Check bounds
@@ -346,7 +346,7 @@ template<class IndexT, class ValT, int RANK>
 					buf << " ";
 				}
 				buf << ")";
-				(*sparse_error)(-1, buf.str().c_str());
+				(*spsparse_error)(-1, buf.str().c_str());
 			}
 		}
 

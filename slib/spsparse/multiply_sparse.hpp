@@ -170,7 +170,7 @@ void multiply(
 
 	// Check inner dimensions
 	if (A.shape[a_sort_order[1]] != B.shape[b_sort_order[1]]) {
-		(*sparse_error)(-1, "Inner dimensions for A (%ld) and B (%ld) must match!", A.shape[a_sort_order[1]], B.shape[b_sort_order[1]]);
+		(*spsparse_error)(-1, "Inner dimensions for A (%ld) and B (%ld) must match!", A.shape[a_sort_order[1]], B.shape[b_sort_order[1]]);
 	}
 
 	// Short-circuit return on empty output
@@ -296,7 +296,7 @@ void multiply(
 
 	// Check inner dimensions
 	if (A.shape[a_sort_order[1]] != V.shape[0]) {
-		(*sparse_error)(-1, "Inner dimensions for A (%ld) and V (%ld) must match!", A.shape[a_sort_order[1]], V.shape[0]);
+		(*spsparse_error)(-1, "Inner dimensions for A (%ld) and V (%ld) must match!", A.shape[a_sort_order[1]], V.shape[0]);
 	}
 
 	// Short-circuit return on empty output

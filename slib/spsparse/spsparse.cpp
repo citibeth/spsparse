@@ -14,7 +14,7 @@ void default_error(int retcode, const char *format, ...)
 	va_list arglist;
 
 	va_start(arglist, format);
-	fprintf(stderr, format, arglist);
+	vfprintf(stderr, format, arglist);
 	va_end(arglist);
 	fprintf(stderr, "\n");
 
@@ -25,7 +25,7 @@ void default_error(int retcode, const char *format, ...)
 //	exit(-1);
 }
 
-error_ptr sparse_error = &default_error;
+error_ptr spsparse_error = &default_error;
 
 const std::array<int,2> ROW_MAJOR = {0,1};
 const std::array<int,2> COL_MAJOR = {1,0};

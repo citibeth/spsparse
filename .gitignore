@@ -30,3 +30,6 @@
 *.bak
 *~
 *#*
+
+build/
+easybuild/
