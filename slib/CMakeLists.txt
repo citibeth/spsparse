@@ -8,7 +8,7 @@ add_library(spsparse SHARED
 	${EVERYTRACE_REFADDR}	# Blank if not USE_EVERYTRACE
 	${SPSPARSE_SOURCE})
 
-target_link_libraries(spsparse ${ALL_LIBS})
+target_link_libraries(spsparse ${EXTERNAL_LIBS})
 install(TARGETS spsparse DESTINATION lib)
 
 # ------------ Header Files

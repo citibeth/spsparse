@@ -245,6 +245,8 @@ public:
 	std::vector<size_t> const &dim_beginnings() const;
 
 	DimBeginningsXiter<ThisCooArrayT> dim_beginnings_xiter() const;
+
+	std::ostream &operator<<(std::ostream &out) const;
 };
 
 

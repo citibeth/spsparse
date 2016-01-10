@@ -7,21 +7,11 @@ find_package(GTest REQUIRED)
 include_directories(${GTEST_INCLUDE_DIRS})
 include_directories(${PROJECT_SOURCE_DIR}/slib)
 
-SET(ALL_LIBS ${GTEST_BOTH_LIBRARIES} ${ALL_LIBS} spsparse)
+SET(ALL_LIBS ${GTEST_BOTH_LIBRARIES} ${EXTERNAL_LIBS} spsparse)
 
-add_executable(test_xiter test_xiter.cpp)
-target_link_libraries(test_xiter ${ALL_LIBS})
-add_test(AllTests test_xiter)
-
-add_executable(test_array test_array.cpp)
-target_link_libraries(test_array ${ALL_LIBS})
-add_test(AllTests test_array)
-
-add_executable(test_netcdf test_netcdf.cpp)
-target_link_libraries(test_netcdf ${ALL_LIBS})
-add_test(AllTests test_netcdf)
-
-add_executable(test_multiply_sparse test_multiply_sparse.cpp)
-target_link_libraries(test_multiply_sparse ${ALL_LIBS})
-add_test(AllTests test_multiply_sparse)
+foreach(TEST xiter array netcdf multiply_sparse)
+	add_executable(test_${TEST} test_${TEST}.cpp)
+	target_link_libraries(test_${TEST} ${ALL_LIBS})
+	add_test(AllTests test_${TEST})
+endforeach()
 
