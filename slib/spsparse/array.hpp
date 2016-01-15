@@ -66,6 +66,54 @@ public:
 		{return wrapped == rhs.wrapped;}
 };
 // -----------------------------------------------------
+template<class IndicesT, class IterIndexT, int RANK, class IterValT, class CollectionT>
+class CooIterator
+{
+protected:
+	CollectionT * const parent;
+	int i;
+public:
+	static const int rank = RANK;
+	typedef IndicesT indices_type;
+	typedef indices_type value_type;	// Standard STL: Type we get upon operator*()
+	typedef IterIndexT index_type;	// Our convention
+	typedef IterValT val_type;	// Extension: Type we get upon val()
+
+	CooIterator(CollectionT *p, int _i) : parent(p), i(_i) {}
+
+
+	indices_type operator[](int n)
+		{ return parent->index(i+n); }
+	indices_type index()
+		{ return parent->index(i); }
+	indices_type operator*()
+		{ return this->operator[](0); }
+
+	CooIterator &operator+=(int n)
+		{i += n; return *this; }
+	CooIterator& operator--()
+		{ return this->operator+=(-1); }
+	CooIterator& operator++()
+		{ return this->operator+=(1); }
+	CooIterator &operator-=(int n)
+		{ return this->operator+=(-n); }
+
+	CooIterator operator+(int n) const
+		{ return CooIterator(parent, i+n); }
+	bool operator==(CooIterator const &rhs) const
+		{ return i == rhs.i; }
+	bool operator!=(const CooIterator& rhs) const
+		{return !this->operator==(rhs); }
+
+
+	int offset() const { return i; }
+	IterIndexT &index(int k)
+		{ return parent->index(k,i); }
+	void set_index(indices_type const &idx)
+		{ parent->set_index(i, idx); }
+	IterValT &val() { return parent->val(i); }
+};
+// -----------------------------------------------------
 template<class IndexT, class ValT, int RANK>
 class CooArray
 {
@@ -151,55 +199,9 @@ public:
 	// -------------------------------------------------
 	// --------------------------------------------------
 	/** Standard STL-type iterator for iterating through a VectorSparseMatrix. */
-	template<class IterValueT, class IterIndexT, class IterValT, class CollectionT>
-	class IteratorDerived
-	{
-	protected:
-		CollectionT * const parent;
-		int i;
-	public:
-		static const int rank = RANK;
-		typedef IterIndexT value_type;	// Standard STL: Type we get upon operator*()
-		typedef IterIndexT index_type;	// Our convention
-		typedef IterValT val_type;	// Extension: Type we get upon val()
 
-		IteratorDerived(CollectionT *p, int _i) : parent(p), i(_i) {}
-
-
-		IterValueT operator[](int n)
-			{ return parent->index(i+n); }
-		IterValueT index()
-			{ return parent->index(i); }
-		IterValueT operator*()
-			{ return this->operator[](0); }
-
-		IteratorDerived &operator+=(int n)
-			{i += n; return *this; }
-		IteratorDerived& operator--()
-			{ return this->operator+=(-1); }
-		IteratorDerived& operator++()
-			{ return this->operator+=(1); }
-		IteratorDerived &operator-=(int n)
-			{ return this->operator+=(-n); }
-
-		IteratorDerived operator+(int n) const
-			{ return IteratorDerived(parent, i+n); }
-		bool operator==(IteratorDerived const &rhs) const
-			{ return i == rhs.i; }
-		bool operator!=(const IteratorDerived& rhs) const
-			{return !this->operator==(rhs); }
-
-
-		int offset() const { return i; }
-		IterIndexT &index(int k)
-			{ return parent->index(k,i); }
-		void set_index(IterValueT const &idx)
-			{ parent->set_index(i, idx); }
-		IterValT &val() { return parent->val(i); }
-	};
-
-	typedef IteratorDerived<const std::array<IndexT, RANK>, const IndexT, const ValT, const ThisCooArrayT> const_iterator;
-	typedef IteratorDerived<std::array<IndexT, RANK>, IndexT, ValT, ThisCooArrayT> iterator;
+	typedef CooIterator<const std::array<IndexT, RANK>, const IndexT, RANK, const ValT, const ThisCooArrayT> const_iterator;
+	typedef CooIterator<std::array<IndexT, RANK>, IndexT, RANK, ValT, ThisCooArrayT> iterator;
 
 	iterator begin(int ix = 0)
 		{ return iterator(this, ix); }
