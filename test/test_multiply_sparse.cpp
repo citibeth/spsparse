@@ -3,7 +3,7 @@
 #include <iostream>
 #include <random>
 #include <gtest/gtest.h>
-#include <spsparse/array.hpp>
+#include <spsparse/VectorCooArray.hpp>
 #include <spsparse/multiply_sparse.hpp>
 #ifdef USE_EVERYTRACE
 #include <everytrace.h>
@@ -42,20 +42,20 @@ TEST_F(SpSparseTest, VectorCooArray)
 {
 	typedef VectorCooArray<int, double, 2> VectorCooArrayT;
 
-	CooMatrix<int, double> row({2,10});
+	VectorCooMatrix<int, double> row({2,10});
 	row.add({0,8}, 6.);
 	row.add({0,4}, 4.);
 	row.add({0,0}, 2.);
 	row.add({0,3}, 3.);
 	row.add({1,8}, 3.);
 
-	CooVector<int, double> scale({10});
+	VectorCooVector<int, double> scale({10});
 	scale.add({0}, 2.);
 //	scale.add({3}, 3.);
 	scale.add({4}, 4.);
 	scale.add({8}, 4.);
 
-	CooMatrix<int, double> col({10,1});
+	VectorCooMatrix<int, double> col({10,1});
 	col.add({0,0}, 2.);
 	col.add({3,0}, 3.);
 //	col.add({4,0}, 4.);
@@ -63,7 +63,7 @@ TEST_F(SpSparseTest, VectorCooArray)
 
 
 	// ------------------ Do the same single row-col test, but with "full" matrix mutliplier
-	CooVector<int, double> eye({10});
+	VectorCooVector<int, double> eye({10});
 	for (int i=0; i<10; ++i) eye.add({i}, 1.);
 
 	VectorCooArray<int, double, 2> ret2;
@@ -87,27 +87,27 @@ void test_random_MM_multiply(unsigned int dsize, int seed)
 	auto dim_distro(std::bind(std::uniform_int_distribution<int>(0,dsize-1), generator));
 	auto val_distro(std::bind(std::uniform_real_distribution<double>(0,1), generator));
 
-	CooMatrix<int, double> A({dsize,dsize});
-	CooMatrix<int, double> B({dsize,dsize});
+	VectorCooMatrix<int, double> A({dsize,dsize});
+	VectorCooMatrix<int, double> B({dsize,dsize});
 	int nranda = (int)(val_distro() * (double)(dsize*dsize));
 	for (int i=0; i<nranda; ++i) A.add({dim_distro(), dim_distro()}, val_distro());
 	int nrandb = (int)(val_distro() * (double)(dsize*dsize));
 	for (int i=0; i<nrandb; ++i) B.add({dim_distro(), dim_distro()}, val_distro());
 
-	CooVector<int, double> eye({dsize});
+	VectorCooVector<int, double> eye({dsize});
 	for (int k=0; k<dsize; ++k) eye.add({k}, 1.0);
 
 // std::cout << "A: " << A << std::endl;
 // std::cout << "B: " << B << std::endl;
 
-	CooMatrix<int, double> C;
+	VectorCooMatrix<int, double> C;
 	multiply(C,1.0,
-		(CooVector<int, double> *)0,	// scalei
+		(VectorCooVector<int, double> *)0,	// scalei
 		A, '.',
 		&eye,	// scalej
-//		(CooVector<int, double> *)0,	// scalej
+//		(VectorCooVector<int, double> *)0,	// scalej
 		B, '.',
-		(CooVector<int, double> *)0);	// scalek
+		(VectorCooVector<int, double> *)0);	// scalek
 
 // std::cout << "C: " << C << std::endl;
 
@@ -141,25 +141,25 @@ void test_random_MV_multiply(unsigned int dsize, int seed)
 	auto dim_distro(std::bind(std::uniform_int_distribution<int>(0,dsize-1), generator));
 	auto val_distro(std::bind(std::uniform_real_distribution<double>(0,1), generator));
 
-	CooMatrix<int, double> A({dsize,dsize});
-	CooVector<int, double> B({dsize});
+	VectorCooMatrix<int, double> A({dsize,dsize});
+	VectorCooVector<int, double> B({dsize});
 	int nranda = (int)(val_distro() * (double)(dsize*dsize));
 	for (int i=0; i<nranda; ++i) A.add({dim_distro(), dim_distro()}, val_distro());
 	int nrandb = (int)(val_distro() * (double)dsize);
 	for (int i=0; i<nrandb; ++i) B.add({dim_distro()}, val_distro());
 
-	CooVector<int, double> eye({dsize});
+	VectorCooVector<int, double> eye({dsize});
 	for (int k=0; k<dsize; ++k) eye.add({k}, 1.0);
 
 // std::cout << "A: " << A << std::endl;
 // std::cout << "B: " << B << std::endl;
 
-	CooVector<int, double> C;
+	VectorCooVector<int, double> C;
 	multiply(C,1.0,
-		(CooVector<int, double> *)0,	// scalei
+		(VectorCooVector<int, double> *)0,	// scalei
 		A, '.',
 //		&eye,	// scalej
-		(CooVector<int, double> *)0,	// scalej
+		(VectorCooVector<int, double> *)0,	// scalej
 		B);
 
 // std::cout << "C: " << C << std::endl;

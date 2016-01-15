@@ -61,7 +61,7 @@ void transpose(AccumulatorT &ret, VectorCooArrayT const &A, std::array<int,Vecto
 
 Code Example
 @code
-CooMatrix<int, double> A;
+VectorCooMatrix<int, double> A;
 A.consolidate({0,1});
 std::vector<size_t> row_start = dim_beginnings(A);
 A.consolidate({1,0});
@@ -121,8 +121,8 @@ printf("]\n");
 
 Example Code:
 @code
-CooMatrix<int, double> const A;
-CooMatrix<int, double> Arm;
+VectorCooMatrix<int, double> const A;
+VectorCooMatrix<int, double> Arm;
 consolidate(Arm, A, {0,1});	// Arm = A row major
 auto row_beginnings(dim_beginnings(Arm));
 for (DimBeginningsXiter<decltype(A)> ii(&A, 0, 1,
@@ -140,7 +140,7 @@ for (DimBeginningsXiter<decltype(A)> ii(&A, 0, 1,
 
 Convenience methods allow a simplification as follows:
 @code
-CooMatrix<int, double> A;
+VectorCooMatrix<int, double> A;
 
 A.consolidate({0,1});
 for (auto ii(A.dim_beginnings_xiter(); !ii.eof(); ++ii) {
@@ -155,7 +155,7 @@ for (auto ii(A.dim_beginnings_xiter(); !ii.eof(); ++ii) {
 
 We can also use this to scan through the matrix in row-major order:
 @code
-CooMatrix<int, double> A;
+VectorCooMatrix<int, double> A;
 
 A.consolidate({1,0});
 for (auto ii(A.dim_beginnings_xiter(); !ii.eof(); ++ii) {

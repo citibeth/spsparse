@@ -12,19 +12,19 @@ namespace spsparse {
 Code Example
 @code
 // --------- Matrix-Matrix Multiplation
-CooMatrix<int, double> A,B,AB,BtAt;
+VectorCooMatrix<int, double> A,B,AB,BtAt;
 multiply(AB, 1.0, NULL, A,'.', NULL, B,'.', NULL);
 multiply(BtAt, 1.0, NULL, B,'T', NULL, A,'T', NULL);
 // Now: AB == BtAt (but we don't yet have a way to compare arrays)
 
-CooMatrix<int, double> ret;
-CooVector<int, double> scalei(A.shape[0]);
-CooVector<int, double> scalej(A.shape[1]);
+VectorCooMatrix<int, double> ret;
+VectorCooVector<int, double> scalei(A.shape[0]);
+VectorCooVector<int, double> scalej(A.shape[1]);
 multiply(AB, 17.0, &scale, A,'.', &scalej, B,'.', NULL);
 
 // --------- Matrix-Vector Multiplation
-CooVector<int, double> V(B.shape[1]);
-CooVector<int, double> retV;
+VectorCooVector<int, double> V(B.shape[1]);
+VectorCooVector<int, double> retV;
 multiply(retV, 1.0, NULL, AB,'.', NULL, V);
 @endcode
 

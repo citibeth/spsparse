@@ -8,9 +8,9 @@
 #if 0
 
 /** (Sparse Matrix) * (Dense Vector) */
-template<class CooMatrixT, class AccumulatorT>
+template<class VectorCooMatrixT, class AccumulatorT>
 void multiply(
-	CooMatrixT const &M,
+	VectorCooMatrixT const &M,
 	blitz::Array<double,1> const &x,
 	AccumulatorT &y,
 	bool handle_nan = false,
@@ -26,9 +26,9 @@ void multiply(
 	}
 }
 
-template<class CooMatrixT, class AccumulatorT>
+template<class VectorCooMatrixT, class AccumulatorT>
 void multiplyT(
-	CooMatrixT const &M,
+	VectorCooMatrixT const &M,
 	blitz::Array<double,1> const &x,
 	AccumulatorT &y,
 	bool handle_nan = false)

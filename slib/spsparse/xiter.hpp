@@ -29,7 +29,7 @@ Two types of extensions to the usual STL iterator interface were needed for SpSp
    in the matrix.  The method val() is used to return the value of an
    element.  For example:
 @code
-CooMatrix<int, double> A;
+VectorCooMatrix<int, double> A;
 for (auto ii = A.begin(); ii != A.end(); ++ii) {
     std::array<int,2> index(*ii);
     printf("A[%d,%d] = %g", index[0], index[1], ii.val();
@@ -40,7 +40,7 @@ for (auto ii = A.begin(); ii != A.end(); ++ii) {
    Note that the iterators on VectorCooArray also add other ways to access
    the index, but these are not part of the ValIterator interface:
 @code
-CooMatrix<int, double> A;
+VectorCooMatrix<int, double> A;
 for (auto ii = A.begin(); ii != A.end(); ++ii)
     printf("A[%d,%d] = %g", ii.index(0), ii.index(1), ii.val();
 @endcode
@@ -100,7 +100,7 @@ into our XIter.
 
 Code Example:
 @code
-	CooVector<int, double> vec;
+	VectorCooVector<int, double> vec;
 	for (auto ii(make_val_xiter(vec.begin(), vec.end());
 		!ii.eof(); ++ii)
 	{ printf("vec[%d] = %d\n", ii.index(0), ii.val()); }
@@ -218,7 +218,7 @@ fish values out of your iterator, access the sub-iterators directly.
 For example:
 
 @code
-CooVector<int, double> v1, v2;
+VectorCooVector<int, double> v1, v2;
 for (auto ii(join2_xiter(
 	make_xiter(v1.begin(), v1.end()),
 	make_xiter(v2.begin(), v2.end())));

@@ -1,7 +1,7 @@
 // https://github.com/google/googletest/blob/master/googletest/docs/Primer.md
 
 #include <gtest/gtest.h>
-#include <spsparse/array.hpp>
+#include <spsparse/VectorCooArray.hpp>
 #include <iostream>
 #ifdef USE_EVERYTRACE
 #include <everytrace.h>
