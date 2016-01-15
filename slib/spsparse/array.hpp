@@ -11,6 +11,8 @@
 #include <sstream>
 #include <algorithm>
 
+#include <ibmisc/iter.hpp>
+
 #include <spsparse/spsparse.hpp>
 #include <spsparse/algorithm.hpp>
 #include <spsparse/xiter.hpp>
@@ -26,6 +28,43 @@ namespace spsparse {
 */
 
 
+// -----------------------------------------------------
+/** @brief Select out just one dimension of the index on iteration.
+
+Wraps CooArray::iterator, changing operator*() to produce produces the
+index in just one dimension.
+
+Code Example
+@code
+CooMatrix<int, double> const A;
+typedef DimIndexIter<decltype(A)::const_iterator> DIType;
+for (DIType ii(1, A.begin()); ii != DIType(1, A.end()); ++ii)
+	printf("Element with column %d and value %d\n", *ii, ii.val());
+@endcode
+
+@see spsparse::CooMatrix::dim_iter(), spsparse::CooMatrix::dim_begin(), spsparse::CooMatrix::dim_end()
+*/
+template<class ValueT, class ValT, class IterT>
+class DimIndexIter : public ibmisc::forward_iterator<ValueT, DimIndexIter<ValueT, ValT, IterT>>
+{
+public:
+	IterT wrapped;
+	const int dim;
+
+	DimIndexIter(int _dim, IterT const &&ii) : wrapped(ii), dim(_dim) {}
+
+	ValueT operator*()
+		{ return wrapped.index(dim); }
+	ValT &val()
+		{ return wrapped.val(); }
+	ValT const val() const
+		{ return wrapped.val(); }
+
+	DimIndexIter &operator++()
+		{ ++wrapped; return *this; }
+	bool operator==(const DimIndexIter& rhs) const
+		{return wrapped == rhs.wrapped;}
+};
 // -----------------------------------------------------
 template<class IndexT, class ValT, int RANK>
 class CooArray
@@ -66,18 +105,18 @@ public:
 
 	IndexT &index(int dim, size_t ix)
 		{ return index_vecs[dim][ix]; }
-	IndexT index(int dim, size_t ix) const
+	IndexT const &index(int dim, size_t ix) const
 		{ return index_vecs[dim][ix]; }
 
 	ValT &val(size_t ix)
 		{ return val_vec[ix]; }
-	ValT val(size_t ix) const
+	ValT const &val(size_t ix) const
 		{ return val_vec[ix]; }
 
 	std::array<IndexT, RANK> index(int ix) const {
-		std::array<IndexT, RANK> ret;
-		for (int k=0; k<RANK; ++k) ret[k] = index(k, ix);
-		return ret;
+		std::array<IndexT, RANK> index_ret;
+		for (int k=0; k<RANK; ++k) index_ret[k] = index(k, ix);
+		return index_ret;
 	}
 	std::vector<IndexT> index_vec(int ix) const {
 		std::vector<IndexT> ret;
@@ -112,103 +151,78 @@ public:
 	// -------------------------------------------------
 	// --------------------------------------------------
 	/** Standard STL-type iterator for iterating through a VectorSparseMatrix. */
-	class iterator {
+	template<class IterValueT, class IterIndexT, class IterValT, class CollectionT>
+	class IteratorDerived
+	{
 	protected:
-		ThisCooArrayT * const parent;
-		size_t i;
+		CollectionT * const parent;
+		int i;
 	public:
 		static const int rank = RANK;
+		typedef IterIndexT value_type;	// Standard STL: Type we get upon operator*()
+		typedef IterIndexT index_type;	// Our convention
+		typedef IterValT val_type;	// Extension: Type we get upon val()
 
-		typedef IndexT value_type;	// Standard STL: Type we get upon operator*()
-		typedef IndexT index_type;	// Our convention
-		typedef ValT val_type;	// Extension: Type we get upon val()
+		IteratorDerived(CollectionT *p, int _i) : parent(p), i(_i) {}
 
-		iterator(ThisCooArrayT *p, size_t _i) : parent(p), i(_i) {}
 
-		size_t offset() const { return i; }
-		bool operator==(iterator const &rhs) const { return i == rhs.i; }
-		bool operator!=(iterator const &rhs) const { return i != rhs.i; }
-		bool operator<(iterator const &rhs) const { return i < rhs.i; }
-		void operator++() { ++i; }
-		IndexT &index(int k) { return parent->index(k,i); }
-		IndexT index(int k) const { return parent->index(k,i); }
-		void set_index(std::array<IndexT, RANK> const &idx)
+		IterValueT operator[](int n)
+			{ return parent->index(i+n); }
+		IterValueT index()
+			{ return parent->index(i); }
+		IterValueT operator*()
+			{ return this->operator[](0); }
+
+		IteratorDerived &operator+=(int n)
+			{i += n; return *this; }
+		IteratorDerived& operator--()
+			{ return this->operator+=(-1); }
+		IteratorDerived& operator++()
+			{ return this->operator+=(1); }
+		IteratorDerived &operator-=(int n)
+			{ return this->operator+=(-n); }
+
+		IteratorDerived operator+(int n) const
+			{ return IteratorDerived(parent, i+n); }
+		bool operator==(IteratorDerived const &rhs) const
+			{ return i == rhs.i; }
+		bool operator!=(const IteratorDerived& rhs) const
+			{return !this->operator==(rhs); }
+
+
+		int offset() const { return i; }
+		IterIndexT &index(int k)
+			{ return parent->index(k,i); }
+		void set_index(IterValueT const &idx)
 			{ parent->set_index(i, idx); }
-		std::array<IndexT, RANK> operator*() const { return index(); }
-		ValT &val() { return parent->val(i); }
-		ValT val() const { return parent->val(i); }
-
-
-		std::array<IndexT, RANK> index() const
-			{ return parent->index(i); }
-		std::vector<IndexT> index_vec() const
-			{ return parent->index_vec(i); }
+		IterValT &val() { return parent->val(i); }
 	};
 
-	// -------------------------------------------------
-	iterator iter(size_t ix) { return iterator(this, ix); }
-	iterator begin() { return iter(0); }
-	iterator end() { return iter(size()); }
+	typedef IteratorDerived<const std::array<IndexT, RANK>, const IndexT, const ValT, const ThisCooArrayT> const_iterator;
+	typedef IteratorDerived<std::array<IndexT, RANK>, IndexT, ValT, ThisCooArrayT> iterator;
 
-	typedef DimIndexIter<iterator> dim_iterator;
-	dim_iterator dim_iter(int dim, size_t ix)
-		{ return dim_iterator(dim, iter(ix)); }
-	dim_iterator dim_begin(int dim)
-		{ return dim_iter(dim, 0); }
-	dim_iterator dim_end(int dim)
-		{ return dim_iter(dim, size()); }
+	iterator begin(int ix = 0)
+		{ return iterator(this, ix); }
+	iterator end(int ix = 0)
+		{ return iterator(this, size() + ix); }
+	const_iterator cbegin(int ix = 0) const
+		{ return const_iterator(this, ix); }
+	const_iterator cend(int ix = 0) const
+		{ return const_iterator(this, size() + ix); }
+	const_iterator begin(int ix = 0) const
+		{ return const_iterator(this, ix); }
+	const_iterator end(int ix = 0) const
+		{ return const_iterator(this, size() - ix); }
 
+	// typedef DimIndexIter<IndexT, ValT, iterator> dim_iterator;
+	typedef DimIndexIter<const IndexT, const ValT, const_iterator> const_dim_iterator;
 
-	// -------------------------------------------------
-	class const_iterator {
-	protected:
-		ThisCooArrayT const * const parent;
-		size_t i;
-	public:
-		static const int rank = RANK;
-		typedef IndexT value_type;	// Standard STL: Type we get upon operator*()
-		typedef IndexT index_type;	// Our convention
-		typedef ValT val_type;	// Extension: Type we get upon val()
-
-		const_iterator(ThisCooArrayT const *p, size_t _i) : parent(p), i(_i) {}
-
-		size_t offset() const { return i; }
-		bool operator==(const_iterator const &rhs) const { return i == rhs.i; }
-		bool operator!=(const_iterator const &rhs) const { return i != rhs.i; }
-		bool operator<(const_iterator const &rhs) const { return i < rhs.i; }
-		void operator++() { ++i; }
-		IndexT index(int k) const { return parent->index(k,i); }
-		ValT val() const { return parent->val(i); }
-		std::array<IndexT, RANK> operator*() const { return index(); }
-
-
-		std::array<IndexT, RANK> index() const
-			{ return parent->index(i); }
-		std::vector<IndexT> index_vec() const
-			{ return parent->index_vec(i); }
-
-	};
-
-	// -------------------------------------------------
-
-	const_iterator iter(size_t ix) const { return const_iterator(this, ix); }
-	const_iterator begin() const { return iter(0); }
-	const_iterator end() const { return iter(size()); }
-
-	typedef DimIndexIter<const_iterator> const_dim_iterator;
-	const_dim_iterator dim_iter(int dim, size_t ix) const
-		{ return const_dim_iterator(dim, iter(ix)); }
+	const_dim_iterator dim_iter(int dim, int ix) const
+		{ return const_dim_iterator(dim, const_iterator(this, ix)); }
 	const_dim_iterator dim_begin(int dim) const
 		{ return dim_iter(dim, 0); }
 	const_dim_iterator dim_end(int dim) const
 		{ return dim_iter(dim, size()); }
-
-	// -------------------------------------------------
-
-
-
-
-
 	// -------------------------------------------------
 	/** Goes in to add mode: legal to add more things to the vector. */
 	void edit()

@@ -18,46 +18,7 @@ The first parameter for an algorithm is always the output (an accumulator).  Int
 */
 
 // ====================================================
-/** @brief Select out just one dimension of the index on iteration.
 
-Wraps CooArray::iterator, changing operator*() to produce produces the
-index in just one dimension.
-
-Code Example
-@code
-CooMatrix<int, double> const A;
-typedef DimIndexIter<decltype(A)::const_iterator> DIType;
-for (DIType ii(1, A.begin()); ii != DIType(1, A.end()); ++ii)
-	printf("Element with column %d and value %d\n", *ii, ii.val());
-@endcode
-
-@see spsparse::CooMatrix::dim_iter(), spsparse::CooMatrix::dim_begin(), spsparse::CooMatrix::dim_end()
-*/
-template<class IterT>
-class DimIndexIter : public WrapForwardValIter<IterT>
-{
-public:
-	typedef typename WrapForwardValIter<IterT>::value_type value_type;
-	const int dim;
-
-	typedef WrapForwardValIter<IterT> WrapT;
-	// Export as is standard with STL
-
-	DimIndexIter(int _dim, IterT const &_ii);
-	DimIndexIter(int _dim, IterT const &&_ii);
-
-	value_type operator*()
-		{ return this->ii.index(dim); }
-};
-
-// ------------- Method Definitions
-template<class IterT>
-DimIndexIter<IterT>::
-	DimIndexIter(int _dim, IterT const &_ii) : WrapT(_ii), dim(_dim) {}
-
-template<class IterT>
-DimIndexIter<IterT>::
-	DimIndexIter(int _dim, IterT const &&_ii) : WrapT(std::move(_ii)), dim(_dim) {}
 
 // -----------------------------------------------------------
 /** @brief Copy a sparse array

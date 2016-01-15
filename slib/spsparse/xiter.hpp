@@ -1,6 +1,8 @@
 #ifndef XITER_HPP
 #define XITER_HPP
 
+#include <type_traits>
+
 namespace spsparse {
 
 /** @defgroup xiter xiter.hpp
@@ -52,39 +54,6 @@ for (auto ii = A.begin(); ii != A.end(); ++ii)
 
 
 // -----------------------------------------------
-/** @brief General superclass for wrapping standard STL forward iterators */
-template<class IterT>
-class WrapForwardValIter {
-public:
-	typedef typename IterT::value_type value_type;
-
-	// http://www.cplusplus.com/reference/iterator/ForwardIterator/
-	IterT ii;
-
-	WrapForwardValIter(IterT const &_ii) : ii(_ii) {}
-	WrapForwardValIter(IterT const &&_ii) : ii(std::move(_ii)) {}
-
-	bool operator==(WrapForwardValIter<IterT> const &other)
-		{ return ii == other.ii; }
-	bool operator!=(WrapForwardValIter<IterT> const &other)
-		{ return ii != other.ii; }
-
-	auto operator*() -> decltype(*ii)
-		{ return *ii; }
-//	auto operator->*() -> decltype(*ii)
-//		{ return ii.operator->*(); }
-
-	auto val() -> decltype(ii.val())
-		{ return ii.val(); }
-
-	void operator++()
-		{ ++ii; }
-
-//	auto operator++(int) -> delctype(ii++)	// postfix
-//		{ return ii++; }
-
-};
-
 // -----------------------------------------------
 /** @brief Convert standard STL iterator into our XIter.
 
@@ -180,7 +149,7 @@ ValSTLXiter<ValSTLIter> make_val_xiter(
 template<class Xiter1T, class Xiter2T, class Xiter3T>
 class Join3Xiter
 {
-	typename Xiter1T::value_type next_match;
+	typename std::remove_const<typename Xiter1T::value_type>::type next_match;
 	bool _eof;
 
 public:
@@ -267,7 +236,7 @@ for (auto ii(join2_xiter(
 template<class Xiter1T, class Xiter2T>
 class Join2Xiter
 {
-	typename Xiter1T::value_type next_match;
+	typename std::remove_const<typename Xiter1T::value_type>::type next_match;
 	bool _eof;
 
 public:

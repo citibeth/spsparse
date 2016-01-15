@@ -77,6 +77,33 @@ TEST_F(SpSparseTest, permutation) {
 
 }
 
+
+TEST_F(SpSparseTest, iterators) {
+	CooArray<int, double, 2> arr2({2,4});
+	arr2.add({1,3}, 5.);
+	arr2.add({1,2}, 3.);
+	arr2.add({0,3}, 17.);
+	arr2.add({1,2}, 15.);
+
+	// Try out iterators a bit
+	auto ii(arr2.begin());
+	EXPECT_NE(ii, arr2.end());
+	EXPECT_EQ(1, ii.index(0));
+	EXPECT_EQ(3, ii.index(1));
+	EXPECT_EQ(5., ii.val());
+	ii.val() = 17.;
+	EXPECT_EQ(17., ii.val());
+
+	std::array<int,2> arr({1,3});
+	EXPECT_EQ(arr, *ii);
+	++ii;
+	EXPECT_NE(ii, arr2.end());
+	EXPECT_EQ(1, ii.index(0));
+	EXPECT_EQ(2, ii.index(1));
+	EXPECT_EQ(3., ii.val());
+
+}
+
 TEST_F(SpSparseTest, transpose) {
 	// 2-D CooArray; test consolidate
 	CooArray<int, double, 2> arr2({2,4});
@@ -136,29 +163,6 @@ TEST_F(SpSparseTest, consolidate) {
 	EXPECT_EQ(std::vector<int>({1,2,3,3}), blitz_to_vector(arr3.indices(1)));	// j
 	EXPECT_EQ(std::vector<double>({14., 18., 17., 5.}), blitz_to_vector(arr3.vals()));
 	EXPECT_EQ(std::vector<size_t>({0,1,2,4}), dim_beginnings(arr3));
-
-}
-
-TEST_F(SpSparseTest, iterators) {
-	CooArray<int, double, 2> arr2({2,4});
-	arr2.add({1,3}, 5.);
-	arr2.add({1,2}, 3.);
-	arr2.add({0,3}, 17.);
-	arr2.add({1,2}, 15.);
-
-	// Try out iterators a bit
-	auto ii(arr2.begin());
-	EXPECT_NE(ii, arr2.end());
-	EXPECT_EQ(1, ii.index(0));
-	EXPECT_EQ(3, ii.index(1));
-	EXPECT_EQ(5., ii.val());
-	std::array<int,2> arr({1,3});
-	EXPECT_EQ(arr, *ii);
-	++ii;
-	EXPECT_NE(ii, arr2.end());
-	EXPECT_EQ(1, ii.index(0));
-	EXPECT_EQ(2, ii.index(1));
-	EXPECT_EQ(3., ii.val());
 
 }
 
