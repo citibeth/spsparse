@@ -47,8 +47,8 @@ protected:
 
 
 TEST_F(SpSparseTest, NetCDF) {
-	// Make a simple CooArray
-	CooArray<int, double, 2> arr1({5,6});
+	// Make a simple VectorCooArray
+	VectorCooArray<int, double, 2> arr1({5,6});
 	arr1.add({1,2}, 2.);
 	arr1.add({3,3}, 6.);
 	arr1.add({4,5}, 1.);
@@ -68,7 +68,7 @@ TEST_F(SpSparseTest, NetCDF) {
 	}
 
 	// Read with alloc
-	CooArray<int, double, 2> arr2;
+	VectorCooArray<int, double, 2> arr2;
 	{
 		ibmisc::NcIO ncio(fname, NcFile::read);
 		ncio_spsparse(ncio, arr2, true, "arr1");
@@ -76,7 +76,7 @@ TEST_F(SpSparseTest, NetCDF) {
 	}
 
 	// Read without alloc
-	CooArray<int, double, 2> arr3(arr1.shape);
+	VectorCooArray<int, double, 2> arr3(arr1.shape);
 	{
 		ibmisc::NcIO ncio(fname, NcFile::read);
 		ncio_spsparse(ncio, arr3, false, "arr1");

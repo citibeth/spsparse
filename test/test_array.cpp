@@ -35,9 +35,9 @@ protected:
 };
 
 
-TEST_F(SpSparseTest, CooArray) {
-	// Make a simple CooArray
-	CooArray<int, double, 1> arr1({4});
+TEST_F(SpSparseTest, VectorCooArray) {
+	// Make a simple VectorCooArray
+	VectorCooArray<int, double, 1> arr1({4});
 	arr1.add({1}, 2.);
 	arr1.add({3}, 6.);
 	EXPECT_EQ(2, arr1.size());
@@ -55,7 +55,7 @@ TEST_F(SpSparseTest, CooArray) {
 	}
 
 	// Test Move Constructor
-	CooArray<int, double, 1> arr2(std::move(arr1));
+	VectorCooArray<int, double, 1> arr2(std::move(arr1));
 	EXPECT_EQ(2, arr2.size());
 	EXPECT_EQ(1, arr2.index(0, 0));
 	EXPECT_EQ(3, arr2.index(0,1));
@@ -64,7 +64,7 @@ TEST_F(SpSparseTest, CooArray) {
 
 /** Check that we can get sorted permutations properly. */
 TEST_F(SpSparseTest, permutation) {
-	CooArray<int, double, 2> arr2({2,4});
+	VectorCooArray<int, double, 2> arr2({2,4});
 	arr2.add({1,3}, 5.);
 	arr2.add({1,2}, 3.);
 	arr2.add({0,3}, 17.);
@@ -79,7 +79,7 @@ TEST_F(SpSparseTest, permutation) {
 
 
 TEST_F(SpSparseTest, iterators) {
-	CooArray<int, double, 2> arr2({2,4});
+	VectorCooArray<int, double, 2> arr2({2,4});
 	arr2.add({1,3}, 5.);
 	arr2.add({1,2}, 3.);
 	arr2.add({0,3}, 17.);
@@ -105,8 +105,8 @@ TEST_F(SpSparseTest, iterators) {
 }
 
 TEST_F(SpSparseTest, transpose) {
-	// 2-D CooArray; test consolidate
-	CooArray<int, double, 2> arr2({2,4});
+	// 2-D VectorCooArray; test consolidate
+	VectorCooArray<int, double, 2> arr2({2,4});
 	arr2.add({1,3}, 5.);
 	arr2.add({1,2}, 3.);
 	arr2.add({0,3}, 17.);
@@ -132,8 +132,8 @@ TEST_F(SpSparseTest, transpose) {
 
 
 TEST_F(SpSparseTest, consolidate) {
-	// 2-D CooArray; test consolidate
-	CooArray<int, double, 2> arr2({2,4});
+	// 2-D VectorCooArray; test consolidate
+	VectorCooArray<int, double, 2> arr2({2,4});
 	arr2.add({1,3}, 5.);
 	arr2.add({1,2}, 3.);
 	arr2.add({0,3}, 17.);
@@ -141,7 +141,7 @@ TEST_F(SpSparseTest, consolidate) {
 	arr2.add({1,2}, 15.);
 
 	// Consolidate row major
-	CooArray<int, double, 2> arr3(arr2.shape);
+	VectorCooArray<int, double, 2> arr3(arr2.shape);
 	consolidate(arr3, arr2, {0,1});
 	EXPECT_EQ(4, arr3.size());
 
@@ -168,8 +168,8 @@ TEST_F(SpSparseTest, consolidate) {
 
 TEST_F(SpSparseTest, dim_beginnings_iterators)
 {
-	typedef CooArray<int, double, 2> CooArrayT;
-	CooArrayT arr2({20,10});
+	typedef VectorCooArray<int, double, 2> VectorCooArrayT;
+	VectorCooArrayT arr2({20,10});
 
 
 	arr2.add({1,0}, 15.);
@@ -177,11 +177,11 @@ TEST_F(SpSparseTest, dim_beginnings_iterators)
 	arr2.add({2,4}, 17.);
 	arr2.add({6,4}, 10.);
 
-	CooArrayT arr3(arr2.shape);
+	VectorCooArrayT arr3(arr2.shape);
 	consolidate(arr3, arr2, {0,1});
 
 	auto abegin(dim_beginnings(arr3));
-	auto dbi(DimBeginningsXiter<CooArrayT>(&arr3, 0, 1, abegin.begin(), abegin.end()));
+	auto dbi(DimBeginningsXiter<VectorCooArrayT>(&arr3, 0, 1, abegin.begin(), abegin.end()));
 
 	// First row
 	EXPECT_EQ(1, *dbi);
@@ -219,8 +219,8 @@ TEST_F(SpSparseTest, dim_beginnings_iterators)
 
 TEST_F(SpSparseTest, dense)
 {
-	typedef CooArray<int, double, 2> CooArrayT;
-	CooArrayT arr2({20,10});
+	typedef VectorCooArray<int, double, 2> VectorCooArrayT;
+	VectorCooArrayT arr2({20,10});
 
 	arr2.add({1,0}, 15.);
 	arr2.add({1,3}, 17.);

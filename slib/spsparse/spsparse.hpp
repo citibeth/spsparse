@@ -62,10 +62,10 @@ different classes that need them.  Provides: rank, index_type, val_type, indices
 
 Code Example
 @code
-template<class CooArrayT>
+template<class VectorCooArrayT>
 class MyClass {
 public:
-	SPSPARSE_LOCAL_TYPES(CooArrayT);
+	SPSPARSE_LOCAL_TYPES(VectorCooArrayT);
 
 };
 @endcode

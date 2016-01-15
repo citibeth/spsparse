@@ -31,7 +31,7 @@ namespace spsparse {
 // -----------------------------------------------------
 /** @brief Select out just one dimension of the index on iteration.
 
-Wraps CooArray::iterator, changing operator*() to produce produces the
+Wraps VectorCooArray::iterator, changing operator*() to produce produces the
 index in just one dimension.
 
 Code Example
@@ -115,7 +115,7 @@ public:
 };
 // -----------------------------------------------------
 template<class IndexT, class ValT, int RANK>
-class CooArray
+class VectorCooArray
 {
 public:
 	static const int rank = RANK;
@@ -127,7 +127,7 @@ public:
 	void set_shape(std::array<size_t, RANK> const &_shape) { shape = _shape; }
 
 protected:
-	typedef CooArray<IndexT, ValT, RANK> ThisCooArrayT;
+	typedef VectorCooArray<IndexT, ValT, RANK> ThisVectorCooArrayT;
 	std::array<std::vector<IndexT>, RANK> index_vecs;
 	std::vector<ValT> val_vec;
 
@@ -142,14 +142,14 @@ public:
 	bool edit_mode;		// Are we in edit mode?
 	std::array<int,RANK> sort_order;	// Non-negative elements if this is sorted
 
-	CooArray();
+	VectorCooArray();
 
-	CooArray(std::array<size_t, RANK> const &_shape);
+	VectorCooArray(std::array<size_t, RANK> const &_shape);
 
-	std::unique_ptr<ThisCooArrayT> new_blank() const
-		{ return std::unique_ptr<ThisCooArrayT>(new ThisCooArrayT(shape)); }
-	ThisCooArrayT make_blank() const
-		{ return ThisCooArrayT(shape); }
+	std::unique_ptr<ThisVectorCooArrayT> new_blank() const
+		{ return std::unique_ptr<ThisVectorCooArrayT>(new ThisVectorCooArrayT(shape)); }
+	ThisVectorCooArrayT make_blank() const
+		{ return ThisVectorCooArrayT(shape); }
 
 	IndexT &index(int dim, size_t ix)
 		{ return index_vecs[dim][ix]; }
@@ -182,12 +182,12 @@ public:
 		{ return vector_to_blitz(val_vec); }
 
 	// Move semantics
-	CooArray(CooArray &&other);
-	void operator=(ThisCooArrayT &&other);
+	VectorCooArray(VectorCooArray &&other);
+	void operator=(ThisVectorCooArrayT &&other);
 
 	// Copy semantics
-	CooArray(CooArray const &other);
-	void operator=(ThisCooArrayT const &other);
+	VectorCooArray(VectorCooArray const &other);
+	void operator=(ThisVectorCooArrayT const &other);
 
 
 	// -------------------------------------------------
@@ -200,8 +200,8 @@ public:
 	// --------------------------------------------------
 	/** Standard STL-type iterator for iterating through a VectorSparseMatrix. */
 
-	typedef CooIterator<const std::array<IndexT, RANK>, const IndexT, RANK, const ValT, const ThisCooArrayT> const_iterator;
-	typedef CooIterator<std::array<IndexT, RANK>, IndexT, RANK, ValT, ThisCooArrayT> iterator;
+	typedef CooIterator<const std::array<IndexT, RANK>, const IndexT, RANK, const ValT, const ThisVectorCooArrayT> const_iterator;
+	typedef CooIterator<std::array<IndexT, RANK>, IndexT, RANK, ValT, ThisVectorCooArrayT> iterator;
 
 	iterator begin(int ix = 0)
 		{ return iterator(this, ix); }
@@ -260,7 +260,7 @@ public:
 	// Sets and returns this->_dim_beginnings
 	std::vector<size_t> const &dim_beginnings() const;
 
-	DimBeginningsXiter<ThisCooArrayT> dim_beginnings_xiter() const;
+	DimBeginningsXiter<ThisVectorCooArrayT> dim_beginnings_xiter() const;
 
 	std::ostream &operator<<(std::ostream &out) const;
 };
@@ -269,22 +269,22 @@ public:
 
 // --------------------------- Method Definitions
 template<class IndexT, class ValT, int RANK>
-CooArray<IndexT, ValT, RANK>::
-	CooArray() : edit_mode(true), dim_beginnings_set(false), sort_order() {
+VectorCooArray<IndexT, ValT, RANK>::
+	VectorCooArray() : edit_mode(true), dim_beginnings_set(false), sort_order() {
 		sort_order[0] = -1;
 		for (int k=0; k<RANK; ++k) shape[k] = 0;	// User must set this later
 	}
 
 template<class IndexT, class ValT, int RANK>
-CooArray<IndexT, ValT, RANK>::
-	CooArray(std::array<size_t, RANK> const &_shape)
+VectorCooArray<IndexT, ValT, RANK>::
+	VectorCooArray(std::array<size_t, RANK> const &_shape)
 	: shape(_shape), edit_mode(true), dim_beginnings_set(false), sort_order() {
 		sort_order[0] = -1;
 	}
 
 template<class IndexT, class ValT, int RANK>
-CooArray<IndexT, ValT, RANK>::
-	CooArray(CooArray &&other) :
+VectorCooArray<IndexT, ValT, RANK>::
+	VectorCooArray(VectorCooArray &&other) :
 		shape(other.shape),
 		index_vecs(std::move(other.index_vecs)),
 		val_vec(std::move(other.val_vec)),
@@ -294,7 +294,7 @@ CooArray<IndexT, ValT, RANK>::
 		sort_order(other.sort_order) {}
 
 template<class IndexT, class ValT, int RANK>
-	void CooArray<IndexT, ValT, RANK>::operator=(ThisCooArrayT &&other) {
+	void VectorCooArray<IndexT, ValT, RANK>::operator=(ThisVectorCooArrayT &&other) {
 		shape = other.shape;
 		index_vecs = std::move(other.index_vecs);
 		val_vec = std::move(other.val_vec);
@@ -305,8 +305,8 @@ template<class IndexT, class ValT, int RANK>
 	}
 
 template<class IndexT, class ValT, int RANK>
-CooArray<IndexT, ValT, RANK>::
-	CooArray(CooArray const &other) :
+VectorCooArray<IndexT, ValT, RANK>::
+	VectorCooArray(VectorCooArray const &other) :
 		shape(other.shape),
 		index_vecs(other.index_vecs),
 		val_vec(other.val_vec),
@@ -316,7 +316,7 @@ CooArray<IndexT, ValT, RANK>::
 		sort_order(other.sort_order) {}
 
 template<class IndexT, class ValT, int RANK>
-	void CooArray<IndexT, ValT, RANK>::operator=(ThisCooArrayT const &other) {
+	void VectorCooArray<IndexT, ValT, RANK>::operator=(ThisVectorCooArrayT const &other) {
 		shape = other.shape;
 		index_vecs = other.index_vecs;
 		val_vec = other.val_vec;
@@ -327,7 +327,7 @@ template<class IndexT, class ValT, int RANK>
 	}
 
 template<class IndexT, class ValT, int RANK>
-void CooArray<IndexT, ValT, RANK>::clear() {
+void VectorCooArray<IndexT, ValT, RANK>::clear() {
 		for (int k=0; k<RANK; ++k) index_vecs[k].clear();
 		val_vec.clear();
 		dim_beginnings_set = false;
@@ -337,16 +337,16 @@ void CooArray<IndexT, ValT, RANK>::clear() {
 	}
 
 template<class IndexT, class ValT, int RANK>
-void CooArray<IndexT, ValT, RANK>::reserve(size_t size) {
+void VectorCooArray<IndexT, ValT, RANK>::reserve(size_t size) {
 		for (int k=0; k<RANK; ++k) index_vecs[k].reserve(size);
 		val_vec.reserve(size);
 	}
 
 template<class IndexT, class ValT, int RANK>
-	void CooArray<IndexT, ValT, RANK>::add(std::array<IndexT, RANK> const index, ValT const val)
+	void VectorCooArray<IndexT, ValT, RANK>::add(std::array<IndexT, RANK> const index, ValT const val)
 	{
 		if (!edit_mode) {
-			(*spsparse_error)(-1, "Must be in edit mode to use CooArray::add()");
+			(*spsparse_error)(-1, "Must be in edit mode to use VectorCooArray::add()");
 		}
 
 		// Check bounds
@@ -373,7 +373,7 @@ template<class IndexT, class ValT, int RANK>
 	}
 
 template<class IndexT, class ValT, int RANK>
-void CooArray<IndexT, ValT, RANK>::consolidate(
+void VectorCooArray<IndexT, ValT, RANK>::consolidate(
 		std::array<int, RANK> const &_sort_order,
 		DuplicatePolicy duplicate_policy,
 		bool handle_nan)
@@ -381,29 +381,29 @@ void CooArray<IndexT, ValT, RANK>::consolidate(
 		// Do nothing if we're already properly consolidated
 		if (this->sort_order == _sort_order && !edit_mode) return;
 
-		ThisCooArrayT ret(shape);
+		ThisVectorCooArrayT ret(shape);
 		spsparse::consolidate(ret, *this, _sort_order, duplicate_policy, handle_nan);
 		*this = std::move(ret);
 	}
 
 template<class IndexT, class ValT, int RANK>
-	blitz::Array<ValT, RANK> CooArray<IndexT, ValT, RANK>::to_dense()
+	blitz::Array<ValT, RANK> VectorCooArray<IndexT, ValT, RANK>::to_dense()
 	{
 		blitz::Array<ValT, RANK> ret(array_to_tiny<int,size_t,rank>(shape));
 		ret = 0;
-		DenseAccum<ThisCooArrayT> accum(ret);
+		DenseAccum<ThisVectorCooArrayT> accum(ret);
 		copy(accum, *this);
 		return ret;
 	}
 
 template<class IndexT, class ValT, int RANK>
 	// Sets and returns this->_dim_beginnings
-	std::vector<size_t> const &CooArray<IndexT, ValT, RANK>::dim_beginnings() const
+	std::vector<size_t> const &VectorCooArray<IndexT, ValT, RANK>::dim_beginnings() const
 	{
 		// See if we need to compute it; lazy eval
 		if (!dim_beginnings_set) {
 			// Const cast OK here for lazy eval implementation
-			ThisCooArrayT *vthis = const_cast<ThisCooArrayT *>(this);
+			ThisVectorCooArrayT *vthis = const_cast<ThisVectorCooArrayT *>(this);
 			vthis->_dim_beginnings = spsparse::dim_beginnings(*this);
 			vthis->dim_beginnings_set = true;
 		}
@@ -411,21 +411,21 @@ template<class IndexT, class ValT, int RANK>
 	}
 
 template<class IndexT, class ValT, int RANK>
-	DimBeginningsXiter <CooArray<IndexT, ValT, RANK>> CooArray<IndexT, ValT, RANK>::dim_beginnings_xiter() const
+	DimBeginningsXiter <VectorCooArray<IndexT, ValT, RANK>> VectorCooArray<IndexT, ValT, RANK>::dim_beginnings_xiter() const
 	{
 		auto &db(dim_beginnings());
 		int const index_dim = sort_order[0];
 		int const val_dim = sort_order[1];
-		return DimBeginningsXiter<ThisCooArrayT>(this, index_dim, val_dim, db.begin(), db.end());
+		return DimBeginningsXiter<ThisVectorCooArrayT>(this, index_dim, val_dim, db.begin(), db.end());
 	}
 
 
 // ---------------------------------------------------------------------------
 template<class IndexT, class ValT>
-using CooMatrix = CooArray<IndexT, ValT, 2>;
+using CooMatrix = VectorCooArray<IndexT, ValT, 2>;
 
 template<class IndexT, class ValT>
-using CooVector = CooArray<IndexT, ValT, 1>;
+using CooVector = VectorCooArray<IndexT, ValT, 1>;
 
 
 
@@ -436,12 +436,12 @@ using CooVector = CooArray<IndexT, ValT, 1>;
 
 // ---------------------------------------------------------------------------
 template<class IndexT, class ValT, int RANK>
-std::ostream &operator<<(std::ostream &os, spsparse::CooArray<IndexT, ValT, RANK> const &A);
+std::ostream &operator<<(std::ostream &os, spsparse::VectorCooArray<IndexT, ValT, RANK> const &A);
 
 template<class IndexT, class ValT, int RANK>
-std::ostream &operator<<(std::ostream &os, spsparse::CooArray<IndexT, ValT, RANK> const &A)
+std::ostream &operator<<(std::ostream &os, spsparse::VectorCooArray<IndexT, ValT, RANK> const &A)
 {
-	os << "CooArray<";
+	os << "VectorCooArray<";
 	stream(os, &A.shape[0], A.shape.size());
 	os << ">(";
 	for (auto ii(A.begin()); ii != A.end(); ++ii) {

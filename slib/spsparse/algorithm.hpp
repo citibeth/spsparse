@@ -24,13 +24,13 @@ The first parameter for an algorithm is always the output (an accumulator).  Int
 /** @brief Copy a sparse array
 @param ret Accumulator for output.
 @param A Input. */
-template<class CooArrayT, class AccumulatorT>
-void copy(AccumulatorT &ret, CooArrayT const &A);
+template<class VectorCooArrayT, class AccumulatorT>
+void copy(AccumulatorT &ret, VectorCooArrayT const &A);
 
-template<class CooArrayT, class AccumulatorT>
-void copy(AccumulatorT &ret, CooArrayT const &A)
+template<class VectorCooArrayT, class AccumulatorT>
+void copy(AccumulatorT &ret, VectorCooArrayT const &A)
 {
-	std::array<int,CooArrayT::rank> idx;
+	std::array<int,VectorCooArrayT::rank> idx;
 	for (auto ii=A.begin(); ii != A.end(); ++ii) {
 		ret.add(ii.index(), ii.val());
 	}
@@ -40,15 +40,15 @@ void copy(AccumulatorT &ret, CooArrayT const &A)
 @param ret Accumulator for output.
 @param A Input.
 @param perm Permutation on dimensions.  ret.dim[i] == A.dim[perm[i]] */
-template<class CooArrayT, class AccumulatorT>
-void transpose(AccumulatorT &ret, CooArrayT const &A, std::array<int,CooArrayT::rank> const &perm);
+template<class VectorCooArrayT, class AccumulatorT>
+void transpose(AccumulatorT &ret, VectorCooArrayT const &A, std::array<int,VectorCooArrayT::rank> const &perm);
 
-template<class CooArrayT, class AccumulatorT>
-void transpose(AccumulatorT &ret, CooArrayT const &A, std::array<int,CooArrayT::rank> const &perm)
+template<class VectorCooArrayT, class AccumulatorT>
+void transpose(AccumulatorT &ret, VectorCooArrayT const &A, std::array<int,VectorCooArrayT::rank> const &perm)
 {
-	std::array<int,CooArrayT::rank> idx;
+	std::array<int,VectorCooArrayT::rank> idx;
 	for (auto ii=A.begin(); ii != A.end(); ++ii) {
-		for (int new_k=0; new_k < CooArrayT::rank; ++new_k) {
+		for (int new_k=0; new_k < VectorCooArrayT::rank; ++new_k) {
 			int old_k = perm[new_k];
 			idx[new_k] = ii.index(old_k);
 		}
@@ -67,20 +67,20 @@ std::vector<size_t> row_start = dim_beginnings(A);
 A.consolidate({1,0});
 std::vector<size_t> col_start = dim_beginnings(A);
 
-See: CooArray::consolidate() */
-template<class CooArrayT>
-std::vector<size_t> dim_beginnings(CooArrayT const &A);
+See: VectorCooArray::consolidate() */
+template<class VectorCooArrayT>
+std::vector<size_t> dim_beginnings(VectorCooArrayT const &A);
 
-template<class CooArrayT>
-std::vector<size_t> dim_beginnings(CooArrayT const &A)
+template<class VectorCooArrayT>
+std::vector<size_t> dim_beginnings(VectorCooArrayT const &A)
 {
-	const int RANK = CooArrayT::rank;
+	const int RANK = VectorCooArrayT::rank;
 
 	std::vector<size_t> abegin;
 
 	// Check that we're sorted by SOME dimension.
 	if (A.sort_order[0] < 0) {
-		(*spsparse_error)(-1, "dim_beginnings() required the CooArray is sorted first.");
+		(*spsparse_error)(-1, "dim_beginnings() required the VectorCooArray is sorted first.");
 	}
 
 	// Get beginning of each row in a (including sentinel at end)
@@ -168,17 +168,17 @@ for (auto ii(A.dim_beginnings_xiter(); !ii.eof(); ++ii) {
 }
 @endcode
 
-@see spsparse::CooArray::dim_beginnings_xiter()
+@see spsparse::VectorCooArray::dim_beginnings_xiter()
 */
-template<class CooArrayT>
+template<class VectorCooArrayT>
 class DimBeginningsXiter : public STLXiter<std::vector<size_t>::const_iterator>
 {
 public:
-	SPSPARSE_LOCAL_TYPES(CooArrayT);
+	SPSPARSE_LOCAL_TYPES(VectorCooArrayT);
 	typedef std::vector<size_t>::const_iterator DimIterT;
 
 protected:
-	CooArrayT const *arr;
+	VectorCooArrayT const *arr;
 	int index_dim;	// Dimension corresponding to our "rows"
 	int val_dim;	// Dimension corresponding to our "cols"
 
@@ -189,7 +189,7 @@ public:
 	@param dim_beginnings_begin Iterator in dim_beginnings array indicating the start of the outer loop (see spsparse::dim_beginnings()).
 	@param dim_beginnings_end Iterator in dim_beginnings array indicating the end of the outer loop (see spsparse::dim_beginnings()). */
 	DimBeginningsXiter(
-		CooArrayT const *_arr,
+		VectorCooArrayT const *_arr,
 		int _index_dim, int _val_dim,
 		DimIterT const &dim_beginnings_begin,
 		DimIterT const &dim_beginnings_end);
@@ -203,19 +203,19 @@ public:
 	major), or row (if we're scanning column major) of the matrix.
 
 	@param _val_dim Dimension to report via operator*()  (1 for row major, 0 for column major).
-	@see spsparse::DimIndexIter, spsparse::CooArray::dim_begin()
+	@see spsparse::DimIndexIter, spsparse::VectorCooArray::dim_begin()
 	*/
-	typedef ValSTLXiter<typename CooArrayT::const_dim_iterator> sub_xiter_type;
+	typedef ValSTLXiter<typename VectorCooArrayT::const_dim_iterator> sub_xiter_type;
 	sub_xiter_type sub_xiter(int _val_dim = -1);
 
 	// No val()
 };
 
 // -------------- Method Definitions
-template<class CooArrayT>
-DimBeginningsXiter<CooArrayT>::
+template<class VectorCooArrayT>
+DimBeginningsXiter<VectorCooArrayT>::
 	DimBeginningsXiter(
-		CooArrayT const *_arr,
+		VectorCooArrayT const *_arr,
 		int _index_dim, int _val_dim,
 		DimIterT const &dim_beginnings_begin,
 		DimIterT const &dim_beginnings_end)
@@ -223,8 +223,8 @@ DimBeginningsXiter<CooArrayT>::
 		arr(_arr), index_dim(_index_dim), val_dim(_val_dim)
 	{}
 
-template<class CooArrayT>
-	typename DimBeginningsXiter<CooArrayT>::sub_xiter_type DimBeginningsXiter<CooArrayT>::sub_xiter(int _val_dim)
+template<class VectorCooArrayT>
+	typename DimBeginningsXiter<VectorCooArrayT>::sub_xiter_type DimBeginningsXiter<VectorCooArrayT>::sub_xiter(int _val_dim)
 	{
 		if (_val_dim < 0) _val_dim = val_dim;
 		size_t a0 = *ii;
@@ -241,23 +241,23 @@ template<class CooArrayT>
 @param duplicate_policy What to do when duplicate entries are encountered (ADD (default), LEAVE_ALONE, REPLACE).
 @param zero_nan If true, treat NaNs as zeros in the matrix (i.e. remove them).  This will prevent NaNs from propagating in computations.
 */
-template<class CooArrayT, class AccumulatorT>
+template<class VectorCooArrayT, class AccumulatorT>
 void consolidate(AccumulatorT &ret,
-	CooArrayT const &A,
-	std::array<int, CooArrayT::rank> const &sort_order,
+	VectorCooArrayT const &A,
+	std::array<int, VectorCooArrayT::rank> const &sort_order,
 	DuplicatePolicy duplicate_policy = DuplicatePolicy::ADD,
 	bool zero_nan = false);	// Treat NaN like 0
 
-template<class CooArrayT, class AccumulatorT>
+template<class VectorCooArrayT, class AccumulatorT>
 void consolidate(AccumulatorT &ret,
-	CooArrayT const &A,
-	std::array<int, CooArrayT::rank> const &sort_order,
+	VectorCooArrayT const &A,
+	std::array<int, VectorCooArrayT::rank> const &sort_order,
 	DuplicatePolicy duplicate_policy = DuplicatePolicy::ADD,
 	bool zero_nan = false)	// Treat NaN like 0
 {
-	const int RANK = CooArrayT::rank;
-	typedef typename CooArrayT::index_type IndexT;
-	typedef typename CooArrayT::val_type ValT;
+	const int RANK = VectorCooArrayT::rank;
+	typedef typename VectorCooArrayT::index_type IndexT;
+	typedef typename VectorCooArrayT::val_type ValT;
 
 	// Nothing to do for zero-size matrices
 	if (A.size() > 0) {
@@ -372,15 +372,15 @@ Consolidate<ArrayT>::
 // -------------------------------------------------------------
 // --------------------------------------------------------
 /** @brief Internal class used by spsparse::sorted_permutation(). */
-template<class CooArrayT>
+template<class VectorCooArrayT>
 struct CmpIndex {
-	const int RANK = CooArrayT::rank;
+	const int RANK = VectorCooArrayT::rank;
 
-	CooArrayT const *arr;
-	std::array<int, CooArrayT::rank> sort_order;
+	VectorCooArrayT const *arr;
+	std::array<int, VectorCooArrayT::rank> sort_order;
 
-	CmpIndex(CooArrayT const *_arr,
-		std::array<int, CooArrayT::rank> const &_sort_order)
+	CmpIndex(VectorCooArrayT const *_arr,
+		std::array<int, VectorCooArrayT::rank> const &_sort_order)
 	: arr(_arr), sort_order(_sort_order) {}
 
 	bool operator()(int i, int j)
@@ -404,16 +404,16 @@ struct CmpIndex {
 @note Sorting is done in-place.  Elements added first will remain
       first, allowing for proper behavior of duplicate_policy in
       spsparse::consolidate(). */
-template<class CooArrayT>
-std::vector<size_t> sorted_permutation(CooArrayT const &A,
-	std::array<int, CooArrayT::rank> const &sort_order);
+template<class VectorCooArrayT>
+std::vector<size_t> sorted_permutation(VectorCooArrayT const &A,
+	std::array<int, VectorCooArrayT::rank> const &sort_order);
 
-template<class CooArrayT>
-std::vector<size_t> sorted_permutation(CooArrayT const &A,
-	std::array<int, CooArrayT::rank> const &sort_order)
+template<class VectorCooArrayT>
+std::vector<size_t> sorted_permutation(VectorCooArrayT const &A,
+	std::array<int, VectorCooArrayT::rank> const &sort_order)
 {
 	// Decide on how we'll sort
-	CmpIndex<CooArrayT> cmp(&A, sort_order);
+	CmpIndex<VectorCooArrayT> cmp(&A, sort_order);
 
 	// Generate a permuatation
 	int n = A.size();

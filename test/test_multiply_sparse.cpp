@@ -38,9 +38,9 @@ protected:
 
 
 #if 0
-TEST_F(SpSparseTest, CooArray)
+TEST_F(SpSparseTest, VectorCooArray)
 {
-	typedef CooArray<int, double, 2> CooArrayT;
+	typedef VectorCooArray<int, double, 2> VectorCooArrayT;
 
 	CooMatrix<int, double> row({2,10});
 	row.add({0,8}, 6.);
@@ -66,7 +66,7 @@ TEST_F(SpSparseTest, CooArray)
 	CooVector<int, double> eye({10});
 	for (int i=0; i<10; ++i) eye.add({i}, 1.);
 
-	CooArray<int, double, 2> ret2;
+	VectorCooArray<int, double, 2> ret2;
 	multiply(ret2, 1.0,
 		&eye, row, '.', &scale, col, '.', &eye);
 std::cout << "ret2: ";

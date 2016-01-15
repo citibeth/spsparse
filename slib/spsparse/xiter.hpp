@@ -37,7 +37,7 @@ for (auto ii = A.begin(); ii != A.end(); ++ii) {
 @endcode
 
    We call an iterator conforming to this property a ValIterator.
-   Note that the iterators on CooArray also add other ways to access
+   Note that the iterators on VectorCooArray also add other ways to access
    the index, but these are not part of the ValIterator interface:
 @code
 CooMatrix<int, double> A;

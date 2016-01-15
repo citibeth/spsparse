@@ -25,15 +25,15 @@ it called / not called?
 // -----------------------------------------------------------
 /** @brief For in-place operations.
 
-Overwrites a CooArray::iterator.  Good for
+Overwrites a VectorCooArray::iterator.  Good for
 in-place operations that we KNOW won't change the size of the
-CooArray (eg: use with spsparse::transpose()).
+VectorCooArray (eg: use with spsparse::transpose()).
 
 @warning Does not bounds-check for the END of the iterator.
 
 Usage Example:
 @code
-CooArray<int,double,2> A;
+VectorCooArray<int,double,2> A;
 OverWriteAccum<decltype(A)::iterator> overwrite(A.begin());
 transpose(overwrite, A, {1,0});
 @endcode
@@ -63,7 +63,7 @@ therefore be used to transpose or remove dimensions.
 
 Usage Example:
 @code
-CooArray<int,double,2> A,B;
+VectorCooArray<int,double,2> A,B;
 PermuteAccum<A::rank, decltype(B)> p(B, {1,0});
 copy(p, A);
 @endcode
@@ -99,17 +99,17 @@ structure.
 
 Usage Example:
 @code
-CooArray<int,double,2> A;
+VectorCooArray<int,double,2> A;
 blitz::Array<double,2> B(array_to_tiny(A.shape));
 DenseAccum<decltype(A)> Baccum(B);
 copy(Baccum, A);
 @endcode
 
 */
-template<class CooArrayT>
+template<class VectorCooArrayT>
 struct DenseAccum
 {
-	SPSPARSE_LOCAL_TYPES(CooArrayT);
+	SPSPARSE_LOCAL_TYPES(VectorCooArrayT);
 
 private:
 	DuplicatePolicy duplicate_policy;
@@ -149,15 +149,15 @@ implement inner products, or just sum over an array.
 
 Usage Example:
 @code
-CooArray<int,double,2> A;
+VectorCooArray<int,double,2> A;
 ScalarAccumulator<decltype(A)> s;
 copy(s, A);
 printf("Sum = %g\n", s.val);
 @endcode
 */
-template<class CooArrayT>
+template<class VectorCooArrayT>
 struct ScalarAccumulator {
-	SPSPARSE_LOCAL_TYPES(CooArrayT);
+	SPSPARSE_LOCAL_TYPES(VectorCooArrayT);
 
 	val_type val;
 	ScalarAccumulator() : val(0) {}
