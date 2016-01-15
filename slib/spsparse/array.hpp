@@ -67,7 +67,7 @@ public:
 };
 // -----------------------------------------------------
 template<class IndicesT, class IterIndexT, int RANK, class IterValT, class CollectionT>
-class CooIterator
+class CooIterator : std::iterator<std::random_access_iterator_tag, IndicesT>
 {
 protected:
 	CollectionT * const parent;
@@ -75,7 +75,7 @@ protected:
 public:
 	static const int rank = RANK;
 	typedef IndicesT indices_type;
-	typedef indices_type value_type;	// Standard STL: Type we get upon operator*()
+//	typedef indices_type value_type;	// Standard STL: Type we get upon operator*()
 	typedef IterIndexT index_type;	// Our convention
 	typedef IterValT val_type;	// Extension: Type we get upon val()
 
@@ -133,6 +133,8 @@ std::ostream &_ostream_out_array(std::ostream &os, ArrayT const &A)
 	os << ")";
 	return os;
 }
+
+
 
 /** @} */
 

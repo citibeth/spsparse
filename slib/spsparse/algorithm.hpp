@@ -428,6 +428,21 @@ std::vector<size_t> sorted_permutation(VectorCooArrayT const &A,
 
 
 // ----------------------------------------------------------
+// =================================================
+
+template<class ArrayT>
+blitz::Array<typename ArrayT::val_t, RANK> to_dense()
+{
+
+	blitz::Array<typename ArrayT::val_t, ArrayT::rank>
+		ret(array_to_tiny<int,size_t,rank>(shape));
+	ret = 0;
+	DenseAccum<ThisHashCooArrayT> accum(ret);
+	copy(accum, *this);
+	return ret;
+}
+
+
 
 /** @} */
 }	// Namespace

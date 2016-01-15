@@ -134,20 +134,6 @@ public:
 	}
 
 	// --------------------------------------------------
-	// In-place algos
-	void consolidate(
-		std::array<int, RANK> const &_sort_order,
-		DuplicatePolicy duplicate_policy = DuplicatePolicy::ADD,
-		bool handle_nan = false);
-
-	void transpose(std::array<int, RANK> const &sort_order)
-	{
-		OverwriteAccum<iterator> overwrite(begin());
-		spsparse::transpose(overwrite, *this, sort_order);
-	}
-
-	blitz::Array<ValT, RANK> to_dense();
-
 	// Sets and returns this->_dim_beginnings
 	std::vector<size_t> const &dim_beginnings() const;
 
@@ -275,16 +261,6 @@ void VectorCooArray<IndexT, ValT, RANK>::consolidate(
 		ThisVectorCooArrayT ret(shape);
 		spsparse::consolidate(ret, *this, _sort_order, duplicate_policy, handle_nan);
 		*this = std::move(ret);
-	}
-
-template<class IndexT, class ValT, int RANK>
-	blitz::Array<ValT, RANK> VectorCooArray<IndexT, ValT, RANK>::to_dense()
-	{
-		blitz::Array<ValT, RANK> ret(array_to_tiny<int,size_t,rank>(shape));
-		ret = 0;
-		DenseAccum<ThisVectorCooArrayT> accum(ret);
-		copy(accum, *this);
-		return ret;
 	}
 
 template<class IndexT, class ValT, int RANK>
