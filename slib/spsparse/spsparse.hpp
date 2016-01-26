@@ -4,7 +4,7 @@
 #include <exception>
 #include <iostream>
 
-#include <spsparse/blitz.hpp>
+#include <ibmisc/blitz.hpp>
 
 namespace spsparse {
 

@@ -68,9 +68,9 @@ public:
 
 
 	blitz::Array<IndexT, 1> indices(int dim) const
-		{ return vector_to_blitz(index_vecs[dim]); }
+		{ return ibmisc::to_blitz(index_vecs[dim]); }
 	blitz::Array<ValT, 1> vals() const
-		{ return vector_to_blitz(val_vec); }
+		{ return ibmisc::to_blitz(val_vec); }
 
 	// Move semantics
 	VectorCooArray(VectorCooArray &&other);
@@ -280,7 +280,7 @@ void VectorCooArray<IndexT, ValT, RANK>::consolidate(
 template<class IndexT, class ValT, int RANK>
 	blitz::Array<ValT, RANK> VectorCooArray<IndexT, ValT, RANK>::to_dense()
 	{
-		blitz::Array<ValT, RANK> ret(array_to_tiny<int,size_t,rank>(shape));
+		blitz::Array<ValT, RANK> ret(ibmisc::to_tiny<int,size_t,rank>(shape));
 		ret = 0;
 		DenseAccum<ThisVectorCooArrayT> accum(ret);
 		copy(accum, *this);
@@ -322,8 +322,6 @@ using VectorCooMatrix = VectorCooArray<IndexT, ValT, 2>;
 template<class IndexT, class ValT>
 using VectorCooVector = VectorCooArray<IndexT, ValT, 1>;
 
-
-/** @} */
 
 }	// Namespace
 #endif	// Guard

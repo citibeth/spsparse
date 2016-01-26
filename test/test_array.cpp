@@ -8,6 +8,7 @@
 #endif
 
 using namespace spsparse;
+using namespace ibmisc;
 
 // The fixture for testing class Foo.
 class SpSparseTest : public ::testing::Test {
@@ -114,19 +115,19 @@ TEST_F(SpSparseTest, transpose) {
 	arr2.add({1,2}, 15.);
 
 	arr2.transpose({0,1});
-	EXPECT_EQ(std::vector<int>({1,1,0,0,1}), blitz_to_vector(arr2.indices(0)));
-	EXPECT_EQ(std::vector<int>({3,2,3,1,2}), blitz_to_vector(arr2.indices(1)));	// j
-	EXPECT_EQ(std::vector<double>({5., 3., 17., 14., 15.}), blitz_to_vector(arr2.vals()));
+	EXPECT_EQ(std::vector<int>({1,1,0,0,1}), to_vector(arr2.indices(0)));
+	EXPECT_EQ(std::vector<int>({3,2,3,1,2}), to_vector(arr2.indices(1)));	// j
+	EXPECT_EQ(std::vector<double>({5., 3., 17., 14., 15.}), to_vector(arr2.vals()));
 
 	arr2.transpose({1,0});
-	EXPECT_EQ(std::vector<int>({3,2,3,1,2}), blitz_to_vector(arr2.indices(0)));	// j
-	EXPECT_EQ(std::vector<int>({1,1,0,0,1}), blitz_to_vector(arr2.indices(1)));
-	EXPECT_EQ(std::vector<double>({5., 3., 17., 14., 15.}), blitz_to_vector(arr2.vals()));
+	EXPECT_EQ(std::vector<int>({3,2,3,1,2}), to_vector(arr2.indices(0)));	// j
+	EXPECT_EQ(std::vector<int>({1,1,0,0,1}), to_vector(arr2.indices(1)));
+	EXPECT_EQ(std::vector<double>({5., 3., 17., 14., 15.}), to_vector(arr2.vals()));
 
 	arr2.transpose({1,0});
-	EXPECT_EQ(std::vector<int>({1,1,0,0,1}), blitz_to_vector(arr2.indices(0)));
-	EXPECT_EQ(std::vector<int>({3,2,3,1,2}), blitz_to_vector(arr2.indices(1)));	// j
-	EXPECT_EQ(std::vector<double>({5., 3., 17., 14., 15.}), blitz_to_vector(arr2.vals()));
+	EXPECT_EQ(std::vector<int>({1,1,0,0,1}), to_vector(arr2.indices(0)));
+	EXPECT_EQ(std::vector<int>({3,2,3,1,2}), to_vector(arr2.indices(1)));	// j
+	EXPECT_EQ(std::vector<double>({5., 3., 17., 14., 15.}), to_vector(arr2.vals()));
 
 }
 
@@ -146,9 +147,9 @@ TEST_F(SpSparseTest, consolidate) {
 	EXPECT_EQ(4, arr3.size());
 
 
-	EXPECT_EQ(std::vector<int>({0,0,1,1}), blitz_to_vector(arr3.indices(0)));
-	EXPECT_EQ(std::vector<int>({1,3,2,3}), blitz_to_vector(arr3.indices(1)));	// j
-	EXPECT_EQ(std::vector<double>({14., 17., 18., 5.}), blitz_to_vector(arr3.vals()));
+	EXPECT_EQ(std::vector<int>({0,0,1,1}), to_vector(arr3.indices(0)));
+	EXPECT_EQ(std::vector<int>({1,3,2,3}), to_vector(arr3.indices(1)));	// j
+	EXPECT_EQ(std::vector<double>({14., 17., 18., 5.}), to_vector(arr3.vals()));
 
 	EXPECT_EQ(std::vector<size_t>({0,2,4}), dim_beginnings(arr3));
 
@@ -159,9 +160,9 @@ TEST_F(SpSparseTest, consolidate) {
 
 	// Consolidate column-major
 	consolidate(arr3, arr2, {1,0});
-	EXPECT_EQ(std::vector<int>({0,1,0,1}), blitz_to_vector(arr3.indices(0)));
-	EXPECT_EQ(std::vector<int>({1,2,3,3}), blitz_to_vector(arr3.indices(1)));	// j
-	EXPECT_EQ(std::vector<double>({14., 18., 17., 5.}), blitz_to_vector(arr3.vals()));
+	EXPECT_EQ(std::vector<int>({0,1,0,1}), to_vector(arr3.indices(0)));
+	EXPECT_EQ(std::vector<int>({1,2,3,3}), to_vector(arr3.indices(1)));	// j
+	EXPECT_EQ(std::vector<double>({14., 18., 17., 5.}), to_vector(arr3.vals()));
 	EXPECT_EQ(std::vector<size_t>({0,1,2,4}), dim_beginnings(arr3));
 
 }

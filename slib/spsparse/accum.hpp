@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <array>
 #include <vector>
+#include <ibmisc/blitz.hpp>
 #include <spsparse/spsparse.hpp>
 
 namespace spsparse {
@@ -100,7 +101,7 @@ structure.
 Usage Example:
 @code
 VectorCooArray<int,double,2> A;
-blitz::Array<double,2> B(array_to_tiny(A.shape));
+blitz::Array<double,2> B(to_tiny(A.shape));
 DenseAccum<decltype(A)> Baccum(B);
 copy(Baccum, A);
 @endcode
@@ -121,8 +122,7 @@ public:
 
 	void add(indices_type const &index, val_type const &val)
 	{
-		array_to_tiny<int, index_type, rank>(bidx, index);
-
+		ibmisc::to_tiny<int, index_type, rank>(bidx, index);
 		val_type &oval(dense(bidx));
 
 		switch(duplicate_policy) {

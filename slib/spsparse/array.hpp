@@ -12,12 +12,12 @@
 #include <algorithm>
 
 #include <ibmisc/iter.hpp>
+#include <ibmisc/blitz.hpp>
 
 #include <spsparse/spsparse.hpp>
 #include <spsparse/algorithm.hpp>
 #include <spsparse/xiter.hpp>
 #include <spsparse/accum.hpp>
-#include <spsparse/blitz.hpp>
 
 namespace spsparse {
 
