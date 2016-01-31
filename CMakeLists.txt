@@ -48,5 +48,5 @@ include_directories($ENV{EB_INCLUDE_PATH})
 # -------- Process subdirectories of the build
 add_subdirectory(slib)
 #add_subdirectory(bin)
-add_subdirectory(test)
+add_subdirectory(tests)
 
