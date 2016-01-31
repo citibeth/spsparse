@@ -125,6 +125,7 @@ public:
 	}
 
 	void add(std::array<IndexT, RANK> const index, ValT const val);
+	void add(blitz::TinyVector<IndexT, RANK> const &index, ValT const val);
 
 	/** Mark that this is now in sorted form. */
 	void set_sorted(std::array<int,RANK> _sort_order)
@@ -233,6 +234,10 @@ void VectorCooArray<IndexT, ValT, RANK>::reserve(size_t size) {
 		val_vec.reserve(size);
 	}
 
+// ------------------------------------------------------------------------
+template<class IndexT, class ValT, int RANK>
+	void VectorCooArray<IndexT, ValT, RANK>::add(std::array<IndexT, RANK> const index, ValT const val);
+
 template<class IndexT, class ValT, int RANK>
 	void VectorCooArray<IndexT, ValT, RANK>::add(std::array<IndexT, RANK> const index, ValT const val)
 	{
@@ -262,6 +267,40 @@ template<class IndexT, class ValT, int RANK>
 		for (int i=0; i<RANK; ++i) index_vecs[i].push_back(index[i]);
 		val_vec.push_back(val);
 	}
+// ------------------------------------------------------------------------
+template<class IndexT, class ValT, int RANK>
+	void VectorCooArray<IndexT, ValT, RANK>::add(std::array<IndexT, RANK> const index, ValT const val);
+
+template<class IndexT, class ValT, int RANK>
+	void VectorCooArray<IndexT, ValT, RANK>::add(blitz::TinyVector<IndexT, RANK> const &index, ValT const val)
+	{
+		if (!edit_mode) {
+			(*spsparse_error)(-1, "Must be in edit mode to use VectorCooArray::add()");
+		}
+
+		// Check bounds
+		for (int i=0; i<RANK; ++i) {
+			if (index[i] < 0 || index[i] >= shape[i]) {
+				std::ostringstream buf;
+				buf << "Sparse index out of bounds: index=(";
+				for (int j=0; j<RANK; ++j) {
+					buf << index[j];
+					buf << " ";
+				}
+				buf << ") vs. shape=(";
+				for (int j=0; j<RANK; ++j) {
+					buf << shape[j];
+					buf << " ";
+				}
+				buf << ")";
+				(*spsparse_error)(-1, buf.str().c_str());
+			}
+		}
+
+		for (int i=0; i<RANK; ++i) index_vecs[i].push_back(index[i]);
+		val_vec.push_back(val);
+	}
+// ---------------------------------------------------------------
 
 template<class IndexT, class ValT, int RANK>
 void VectorCooArray<IndexT, ValT, RANK>::consolidate(
