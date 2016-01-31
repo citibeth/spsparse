@@ -125,7 +125,7 @@ public:
 	}
 
 	void add(std::array<IndexT, RANK> const index, ValT const val);
-	void add(blitz::TinyVector<IndexT, RANK> const &index, ValT const val);
+	void add_blitz(blitz::TinyVector<IndexT, RANK> const &index, ValT const val);
 
 	/** Mark that this is now in sorted form. */
 	void set_sorted(std::array<int,RANK> _sort_order)
@@ -236,9 +236,6 @@ void VectorCooArray<IndexT, ValT, RANK>::reserve(size_t size) {
 
 // ------------------------------------------------------------------------
 template<class IndexT, class ValT, int RANK>
-	void VectorCooArray<IndexT, ValT, RANK>::add(std::array<IndexT, RANK> const index, ValT const val);
-
-template<class IndexT, class ValT, int RANK>
 	void VectorCooArray<IndexT, ValT, RANK>::add(std::array<IndexT, RANK> const index, ValT const val)
 	{
 		if (!edit_mode) {
@@ -269,10 +266,7 @@ template<class IndexT, class ValT, int RANK>
 	}
 // ------------------------------------------------------------------------
 template<class IndexT, class ValT, int RANK>
-	void VectorCooArray<IndexT, ValT, RANK>::add(std::array<IndexT, RANK> const index, ValT const val);
-
-template<class IndexT, class ValT, int RANK>
-	void VectorCooArray<IndexT, ValT, RANK>::add(blitz::TinyVector<IndexT, RANK> const &index, ValT const val)
+	void VectorCooArray<IndexT, ValT, RANK>::add_blitz(blitz::TinyVector<IndexT, RANK> const &index, ValT const val)
 	{
 		if (!edit_mode) {
 			(*spsparse_error)(-1, "Must be in edit mode to use VectorCooArray::add()");

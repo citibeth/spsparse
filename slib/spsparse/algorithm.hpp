@@ -427,15 +427,15 @@ std::vector<size_t> sorted_permutation(VectorCooArrayT const &A,
 }
 // ----------------------------------------------------------
 template<class TypeT, int RANK, class CooArrayT>
-to_sparse(CooArrayT &ret,
+void to_sparse(CooArrayT &ret,
 	blitz::Array<TypeT, RANK> const &arr);
 
 template<class TypeT, int RANK, class CooArrayT>
-to_sparse(CooArrayT &ret,
+void to_sparse(CooArrayT &ret,
 	blitz::Array<TypeT, RANK> const &arr)
 {
 	for (auto ii=arr.begin(); ii != arr.end(); ++ii) {
-		if (*ii != 0) ret.add(ii.position(), *ii);
+		if (*ii != 0) ret.add_blitz(ii.position(), *ii);
 	}
 }
 // ----------------------------------------------------------

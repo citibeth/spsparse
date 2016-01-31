@@ -243,6 +243,30 @@ TEST_F(SpSparseTest, dense)
 }
 
 
+TEST_F(SpSparseTest, dense_to_blitz)
+{
+	typedef VectorCooArray<int, double, 2> VectorCooArrayT;
+
+	blitz::Array<double,2> dense1(4,5);
+	dense1(2,3) = 5.0;
+	dense1(2,4) = 6.0;
+	dense1(0,1) = 7.0;
+
+	VectorCooArrayT sparse1({4,5});
+	to_sparse(sparse1, dense1);
+	blitz::Array<double,2> dense2(sparse1.to_dense());
+
+	for (int i=0; i<dense1.extent(0); ++i) {
+	for (int j=0; j<dense1.extent(0); ++j) {
+		double const d1(dense1(i,j));
+		double const d2(dense2(i,j));
+
+		EXPECT_EQ(d1, d2);
+	}}
+
+}
+
+
 int main(int argc, char **argv) {
 #ifdef USE_EVERYTRACE
 	everytrace_init();
